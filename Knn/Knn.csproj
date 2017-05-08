@@ -124,6 +124,7 @@
     <Compile Include="Drop3.cs" />
     <Compile Include="Evolutionary.cs" />
     <Compile Include="Genetic.cs" />
+    <Compile Include="Profiler.cs" />
     <Compile Include="Sorting.cs" />
     <Compile Include="DataSetHelper.cs" />
     <Compile Include="FlatArray.cs" />
@@ -135,6 +136,7 @@
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
       <DependentUpon>Settings.settings</DependentUpon>
     </Compile>
+    <Compile Include="Thrust.cs" />
     <Compile Include="Utils.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -182,8 +184,12 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="kernels\cudart32_80.dll" />
-    <Content Include="kernels\cudart64_80.dll" />
+    <Content Include="kernels\Cuda.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="kernels\CudaFunctions.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

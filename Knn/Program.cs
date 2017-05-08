@@ -111,23 +111,24 @@ class Program
         //  e.CalculateClasses(splited[0], splited[1]);
 
         splited[0].ResetIndeces();
-        Drop3 drop = new Drop3();
-        drop.CasheSize = 5;
-        drop.K = 3;
-        var indexesToStay = drop.Apply(splited[0]);
-        var teaching = splited[0].Filter(indexesToStay);
 
-        var parentGen = new byte[splited[0].Classes.Length];
-        foreach (var item in indexesToStay)
-        {
-            parentGen[item] = 1;
-        }
+        //Drop3 drop = new Drop3();
+        //drop.CasheSize = 5;
+        //drop.K = 3;
+        //var indexesToStay = drop.Apply(splited[0]);
+        //var teaching = splited[0].Filter(indexesToStay);
 
-        Evolutionary e = new Evolutionary(splited[0],splited[1],100,parentGen);
-        var res = Knn(teaching, splited[1], 3);
+        //var parentGen = new byte[splited[0].Classes.Length];
+        //foreach (var item in indexesToStay)
+        //{
+        //    parentGen[item] = 1;
+        //}
 
-        Console.WriteLine(1- teaching.Classes.Length/(float) splited[0].Classes.Length);
-        Console.WriteLine(res);
+        Evolutionary e = new Evolutionary(splited[0],splited[1],100,null);
+      //  var res = Knn(teaching, splited[1], 3);
+
+        //Console.WriteLine(1- teaching.Classes.Length/(float) splited[0].Classes.Length);
+        //Console.WriteLine(res);
 
 
     }

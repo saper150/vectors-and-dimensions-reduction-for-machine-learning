@@ -8,15 +8,6 @@
 
 #include "HeapData.h"
 
-
-#define _SIZE_T_DEFINED 
-#ifndef __CUDACC__ 
-#define __CUDACC__ 
-#endif 
-#ifndef __cplusplus 
-#define __cplusplus 
-#endif
-
 extern "C"  
 {
 

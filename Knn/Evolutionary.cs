@@ -3,9 +3,16 @@ using ManagedCuda.VectorTypes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
+
+struct subject {
+    public float fitness;
+    public int accuracy;
+    public int length;
+}
 
 class Evolutionary : IDisposable
 {
@@ -14,13 +21,16 @@ class Evolutionary : IDisposable
     CudaDataSet teaching;
     CudaDataSet test;
 
+    #region deviceMemories
+
     CudaDeviceVariable<float> deviceTeachingVectors;
     CudaDeviceVariable<int> deviceTeachingClasses;
+    CudaDeviceVariable<int> neaboursIndexes;
+
 
     CudaDeviceVariable<float> deviceTestVectors;
     CudaDeviceVariable<int> deviceTestClasses;
 
-    CudaDeviceVariable<int> deviceClasses;
 
     CudaDeviceVariable<byte> populationGens;
     CudaDeviceVariable<byte> populationGens2;
@@ -30,11 +40,31 @@ class Evolutionary : IDisposable
     CudaDeviceVariable<int> deviceVectorSizes;
     CudaDeviceVariable<float> deviceFitnes;
 
-    int popSize;
+    #endregion
 
-    int k = 3;
-    int countToPass = 2;
-    float alpha = 0.7f;
+    CudaKernel calculateNearestNeabours;
+    CudaKernel createInitialPopulationKernel;
+    CudaKernel calculateAccuracyKernel;
+    CudaKernel calculateGenLengthsKernel;
+
+    CudaKernel performGeneticAlgorythm;
+
+    int threadsPerBlock = 256;
+  
+
+
+    int popSize;
+    int k = 7;
+    int countToPass = 4;
+    float alpha = 0.8f;
+    float mutationRate = 0.01f;
+    float crosoverRate = 0.7f;
+
+
+    int genLength;
+
+    Profiler profiler = new Profiler();
+
     public void AllocateMemory()
     {
 
@@ -43,7 +73,7 @@ class Evolutionary : IDisposable
         deviceTeachingClasses = teaching.Classes;
         deviceTestClasses = test.Classes;
 
-        deviceClasses = 
+        neaboursIndexes =
             new CudaDeviceVariable<int>(teaching.Classes.Length * test.Classes.Length);
 
         populationGens = 
@@ -55,33 +85,118 @@ class Evolutionary : IDisposable
         deviceAccuracy = new CudaDeviceVariable<int>(popSize);
         deviceVectorSizes = new CudaDeviceVariable<int>(popSize);
         deviceFitnes = new CudaDeviceVariable<float>(popSize);
+
     }
     public void CreateInitialPopulation(byte[] parrent) {
 
         if (parrent.Length != teaching.Vectors.GetLength(0))
             throw new Exception("parent is incorrect length");
 
-        var kernel = context.LoadKernel("kernels/evolutionary.ptx", "createInitialPopulation");
-        kernel.GridDimensions = 1;
-        kernel.BlockDimensions = popSize;
         using (CudaDeviceVariable<byte> deviceParrent = parrent) {
 
-            kernel.Run(
+            createInitialPopulationKernel.Run(
                 deviceParrent.DevicePointer,
-                parrent.Length,
-                populationGens.DevicePointer,
-                popSize
+                populationGens.DevicePointer
                 );
-
-            //var hostGens = new FlattArray<byte>((byte[])populationGens,parrent.Length).To2d();
-
-
-            Console.WriteLine();
+            var population = new FlattArray<byte>((byte[])populationGens, genLength).To2d() ;
         }
 
     }
 
+    public void createRandomPopulation() {
+        FlattArray<byte> population = 
+            new FlattArray<byte>(popSize, teaching.Classes.Length);
+        Random r = new Random();
 
+        for (int i = 0; i < population.GetLength(0); i++)
+        {
+            for (int j = 0; j < population.GetLength(1); j++)
+            {
+                population[i, j] = r.NextDouble() > 0.5 ? (byte)1 : (byte)0;
+            }
+        }
+        populationGens = population.Raw;
+
+    }
+
+    public void LoadKernels()
+    {
+
+
+        #region calculateNearestNeaboursKernel
+        {
+            calculateNearestNeabours =
+                context.LoadKernel("kernels/evolutionary.ptx", "calculateNearestNeabours");
+            calculateNearestNeabours.GridDimensions =
+                test.Vectors.GetLength(0) / threadsPerBlock + 1;
+            calculateNearestNeabours.BlockDimensions = threadsPerBlock;
+            setConstants(calculateNearestNeabours);
+        }
+        #endregion
+
+        #region geneticAlgorythmKernel
+
+        {
+            performGeneticAlgorythm = context.LoadKernel("kernels/evolutionary.ptx", "genetic");
+            performGeneticAlgorythm.GridDimensions = 1;
+            performGeneticAlgorythm.BlockDimensions = popSize;
+            performGeneticAlgorythm.DynamicSharedMemory =
+                (uint)(sizeof(float) * popSize);
+            setConstants(performGeneticAlgorythm);
+        }
+        #endregion
+
+        #region accuracyKernel
+        {
+            calculateAccuracyKernel = context.LoadKernel("kernels/evolutionary.ptx", "calculateAccuracy");
+            setConstants(calculateAccuracyKernel);
+
+            dim3 gridDimension = new dim3()
+            {
+                x = (uint)(test.Vectors.GetLength(0) / threadsPerBlock + 1),
+                y = (uint)popSize,
+                z = 1
+            };
+            calculateAccuracyKernel.GridDimensions = gridDimension;
+            calculateAccuracyKernel.BlockDimensions = threadsPerBlock;
+
+        }
+        #endregion
+
+        #region genLengthKernel
+        {
+            calculateGenLengthsKernel =
+                context.LoadKernel("kernels/evolutionary.ptx", "countVectors");
+            calculateGenLengthsKernel.BlockDimensions = popSize;
+            calculateGenLengthsKernel.GridDimensions = 1;
+
+            setConstants(calculateGenLengthsKernel);
+        }
+        #endregion
+
+        #region initialPopulationkernel
+        {
+            createInitialPopulationKernel = context.LoadKernel("kernels/evolutionary.ptx", "createInitialPopulation");
+            createInitialPopulationKernel.GridDimensions = 1;
+            createInitialPopulationKernel.BlockDimensions = popSize;
+            setConstants(createInitialPopulationKernel);
+        }
+        #endregion
+
+    }
+
+
+    private void setConstants(CudaKernel kernel) {
+
+        kernel.SetConstantVariable("popSize", popSize);
+        kernel.SetConstantVariable("genLength", genLength);
+        kernel.SetConstantVariable("k", k);
+        kernel.SetConstantVariable("countToPass", countToPass);
+        kernel.SetConstantVariable("testVectorsCount", test.Classes.Length);
+        kernel.SetConstantVariable("teachingVectorsCount", teaching.Classes.Length);
+        kernel.SetConstantVariable("attributeCount", teaching.Vectors.GetLength(1));
+
+    }
     public Evolutionary(
         CudaDataSet teaching, 
         CudaDataSet test,
@@ -94,111 +209,146 @@ class Evolutionary : IDisposable
         this.teaching = teaching;
         this.test = test;
         this.popSize = popSize;
+        this.genLength = teaching.Classes.Length;
+
+        LoadKernels();
         AllocateMemory();
 
+        profiler.Start("calculate classes");
         CalculateClasses();
-        CreateInitialPopulation(parrent);
+        profiler.Stop("calculate classes");
 
-        CalculateFitnes();
+        //CreateInitialPopulation(parrent);
+        profiler.Start("create random population");
+        createRandomPopulation();
+        profiler.Stop("create random population");
+
+
+        for (int i = 0; i < 100; i++)
+        {
+            profiler.Start("iteration");
+            Genetics();
+            profiler.Stop("iteration");
+
+        }
+        profiler.Print();
+        subject best = FindFitest();
+        Console.WriteLine($"best fitness:\t{best.fitness}");
+        Console.WriteLine($"best accuracy:\t{best.accuracy}");
+        Console.WriteLine($"shortest:\t{best.length}");
 
     }
 
+
     private void CalculateClasses()
     {
-
-        const int threadsPerBlock = 256;
-        var kernel = context.LoadKernel("kernels/evolutionary.ptx", "calculateDistances");
-
-        kernel.GridDimensions = test.Vectors.GetLength(0) / threadsPerBlock + 1;
-        kernel.BlockDimensions = threadsPerBlock;
-
 
         using (CudaDeviceVariable<float> deviceDistancesMemory =
             new CudaDeviceVariable<float>(teaching.Classes.Length * test.Classes.Length))
         {
 
-            kernel.Run(
+            calculateNearestNeabours.Run(
                 deviceTeachingVectors.DevicePointer,
-                teaching.Vectors.GetLength(0),
                 deviceTestVectors.DevicePointer,
-                test.Vectors.GetLength(0),
-                deviceTeachingClasses.DevicePointer,
-                teaching.Vectors.GetLength(1),
                 deviceDistancesMemory.DevicePointer,
-                deviceClasses.DevicePointer
+                neaboursIndexes.DevicePointer
                 );
-
-            FlattArray<float> distanceResult =
-                new FlattArray<float>(deviceDistancesMemory, teaching.Classes.Length);
 
         }
 
     }
 
 
-
     public void CalculateAccuracy()
     {
-        const int threadsPerBlock = 256;
-        var kernel = context.LoadKernel("kernels/evolutionary.ptx", "findNewNeabours");
+        context.ClearMemory(deviceAccuracy.DevicePointer, 0, deviceAccuracy.SizeInBytes);
 
-        dim3 gridDimension = new dim3() {
-            x = (uint)(test.Vectors.GetLength(0)/threadsPerBlock + 1),
-            y = (uint)popSize,
-            z = 1
-        };
-
-        kernel.GridDimensions = gridDimension;
-        kernel.BlockDimensions = threadsPerBlock;
-
-        kernel.Run(
+        calculateAccuracyKernel.Run(
             deviceTestClasses.DevicePointer,
-            test.Vectors.GetLength(0),
-            deviceClasses.DevicePointer,
-            teaching.Vectors.GetLength(0),
+            deviceTeachingClasses.DevicePointer,
             populationGens.DevicePointer,
-            popSize,
-            k,
-            countToPass,
+            neaboursIndexes.DevicePointer,
             deviceAccuracy.DevicePointer
             );
-
-        int[] hostR = deviceAccuracy;
 
     }
 
     public void CalculateVectorLengths() {
-        var kernel = 
-            context.LoadKernel("kernels/evolutionary.ptx", "countVectors");
 
-        kernel.BlockDimensions = popSize;
-        kernel.Run(
+        calculateGenLengthsKernel.Run(
             populationGens.DevicePointer,
-            teaching.Vectors.GetLength(0),
             deviceVectorSizes.DevicePointer
             );
 
-        int[] a = deviceVectorSizes;
-  
     }
 
-    private void CalculateFitnes() {
+    private void Genetics() {
+
+        profiler.Start("calculate gen lengths");
         CalculateVectorLengths();
+        profiler.Stop("calculate gen lengths");
+
+        profiler.Start("calculate accuracy");
         CalculateAccuracy();
+        profiler.Stop("calculate accuracy");
 
-        var kernel =
-                context.LoadKernel("kernels/evolutionary.ptx", "calculateFitnes");
+        profiler.Start("calculate avrageAccuracy");
+        float avgAccuracy = Thrust.Avrage(deviceAccuracy);
+        profiler.Stop("calculate avrageAccuracy");
 
-        kernel.BlockDimensions = popSize;
-        kernel.Run(
+        profiler.Start("calculate avrageGenLength");
+        float avgVectorLen = Thrust.Avrage(deviceVectorSizes);
+        profiler.Stop("calculate avrageGenLength");
+
+        profiler.Start("performin genetic algorythm");
+        performGeneticAlgorythm.Run(
             deviceAccuracy.DevicePointer,
             deviceVectorSizes.DevicePointer,
             alpha,
+            populationGens.DevicePointer,
+            populationGens2.DevicePointer,
+            crosoverRate,
+            mutationRate,
+            avgAccuracy,
+            avgVectorLen,
             deviceFitnes.DevicePointer
             );
+        profiler.Stop("performin genetic algorythm");
 
-        float[] a = deviceFitnes;
 
+        var tmp = populationGens;
+        populationGens = populationGens2;
+        populationGens2 = tmp;
+
+        profiler.Start("finding fitest");
+        subject best = FindFitest();
+        profiler.Stop("finding fitest");
+
+
+        //Console.WriteLine($"best fitness:\t{best.fitness}");
+        //Console.WriteLine($"best accuracy:\t{best.accuracy}");
+        //Console.WriteLine($"shortest:\t{best.length}");
+
+
+        Console.WriteLine();
+
+    }
+    [DllImport("kernels/CudaFunctions.dll", EntryPoint = "FindFitest")]
+    static extern subject __findFitest(
+        ManagedCuda.BasicTypes.SizeT ptr1,
+        ManagedCuda.BasicTypes.SizeT ptr2,
+        ManagedCuda.BasicTypes.SizeT ptr3,
+        int size
+        );
+
+    public subject FindFitest()
+    {
+        return __findFitest(
+            deviceFitnes.DevicePointer.Pointer,
+            deviceAccuracy.DevicePointer.Pointer,
+            deviceVectorSizes.DevicePointer.Pointer,
+            deviceVectorSizes.Size
+            );
     }
 
 
