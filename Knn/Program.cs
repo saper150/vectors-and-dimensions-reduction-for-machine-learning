@@ -99,7 +99,10 @@ class Program
     static void Main(string[] args)
     {
 
-        System.Globalization.CultureInfo customCulture = (System.Globalization.CultureInfo)System.Threading.Thread.CurrentThread.CurrentCulture.Clone();
+
+
+
+            System.Globalization.CultureInfo customCulture = (System.Globalization.CultureInfo)System.Threading.Thread.CurrentThread.CurrentCulture.Clone();
         customCulture.NumberFormat.NumberDecimalSeparator = ".";
         System.Threading.Thread.CurrentThread.CurrentCulture = customCulture;
 
@@ -123,8 +126,25 @@ class Program
         //{
         //    parentGen[item] = 1;
         //}
+        var p = new byte[] {1,1,1,1 };
 
-        Evolutionary e = new Evolutionary(splited[0],splited[1],100,null);
+        int popSize = 100;
+
+        using (CudaContext context = new CudaContext())
+        {
+            DeviceDataSet teaching = new DeviceDataSet(splited[0]);
+            DeviceDataSet test= new DeviceDataSet(splited[1]);
+
+
+            IFitnessFunction fitnessFunc = new DimensionReductionFitness(context, teaching, test, popSize);
+
+
+                var d = new Evolutionary2(context, fitnessFunc, popSize, p);
+
+        }
+
+
+        //Evolutionary e = new Evolutionary(splited[0],splited[1],100,null);
       //  var res = Knn(teaching, splited[1], 3);
 
         //Console.WriteLine(1- teaching.Classes.Length/(float) splited[0].Classes.Length);

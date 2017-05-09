@@ -253,6 +253,77 @@ namespace Nunit
         }
 
 
+        [Test]
+        public void VarianceTest() {
+            var data = new float[,] {
+                {1,1,1 },
+                {2,1,5 },
+                {3,1,8 }
+            };
+            var flat = new FlattArray<float>(data);
+
+            var variances = DataSetHelper.Variances(flat);
+
+            Assert.AreEqual((float)0.66666666666667, variances[0]);
+            Assert.AreEqual((float)0, variances[1]);
+            Assert.AreEqual((float)8.2222222222222, variances[2]);
+
+        }
+        //[Test]
+        //public void RemoveColumnsTest() {
+        //    var data = new float[,] {
+        //        {0,1,2,3,4 }
+        //    };
+
+        //    var flat = new FlattArray<float>(data);
+        //    var columnsToRemove = new int[] {2, 3 };
+        //    var res = DimensionReduction.RemoveColumns(flat, columnsToRemove);
+        //    Assert.AreEqual(flat.GetLength(1) - columnsToRemove.Length, res.GetLength(1));
+
+        //    Assert.AreEqual(0, res[0, 0]);
+        //    Assert.AreEqual(1, res[0, 1]);
+        //    Assert.AreEqual(4, res[0, 2]);
+
+        //}
+
+
+
+        //[Test]
+        //public void RemoveColumnsTest2()
+        //{
+        //    var data = new float[,] {
+        //        {1,2,3,4,5 },
+        //        {6,7,8,9,10 },
+        //        {11,12,13,14,15 },
+
+        //    };
+
+        //    var flat = new FlattArray<float>(data);
+        //    var columnsToRemove = new int[] { 0, 3 };
+
+        //    var res = DimensionReduction.RemoveColumns(flat, columnsToRemove);
+
+        //    Assert.AreEqual(flat.GetLength(1) - columnsToRemove.Length, res.GetLength(1));
+        //    Assert.AreEqual(2, res[0, 0]);
+        //    Assert.AreEqual(7, res[1, 0]);
+        //    Assert.AreEqual(12, res[2, 0]);
+
+        //    Assert.AreEqual(3, res[0, 1]);
+        //    Assert.AreEqual(8, res[1, 1]);
+        //    Assert.AreEqual(13, res[2, 1]);
+
+        //    Assert.AreEqual(5, res[0, 2]);
+        //    Assert.AreEqual(10, res[1, 2]);
+        //    Assert.AreEqual(15, res[2, 2]);
+
+
+        //}
+
+
+
+
+
+
     }
 
 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 public static class CudaDataSetExtensions {
     public static CudaDataSet Filter(
@@ -147,20 +148,9 @@ public static class DataSetHelper
 
     public static void Normalize(CudaDataSet data) {
 
-        var vectors = data.Vectors;
-        float[] avg = new float[vectors.GetLength(1)];
-        for (int row = 0; row < vectors.GetLength(0); row++)
-        {
-            for (int col = 0; col < vectors.GetLength(1); col++)
-            {
-                avg[col] += vectors[row,col];
-            }
-        }
 
-        for (int i = 0; i < avg.Length; i++)
-        {
-            avg[i] /= vectors.GetLength(0);
-        }
+        var vectors = data.Vectors;
+        float[] avg = ColumnsAvrages(data);
 
 
         float[] standardDeviation = new float[vectors.GetLength(0)];
@@ -186,10 +176,51 @@ public static class DataSetHelper
                 vectors[row, col] = (vectors[row, col] - standardDeviation[col]) / avg[col];
             }
         }
+    }
 
+
+    public static float[] Variances(FlattArray<float> vectors) {
+
+        float[] variances = new float[vectors.GetLength(1)];
+        Parallel.For(0, vectors.GetLength(1), col =>
+        {
+            float avrage = ColumnAvrage(vectors, col);
+            float[] diffrencesSquared = new float[vectors.GetLength(0)];
+            for (int row = 0; row < vectors.GetLength(0); row++)
+            {
+                float f = vectors[row, col] - avrage;
+                diffrencesSquared[row] = f * f;
+            }
+            variances[col] = diffrencesSquared.Average();
+
+        });
+
+        return variances;
+    }
+
+
+    public static float ColumnAvrage(FlattArray<float> data,int column) {
+        float avg = 0;
+        for (int i = 0; i < data.GetLength(0); i++)
+        {
+            avg += data[i,column];
+        }
+        return avg / data.GetLength(0);
 
     }
 
+    public static float[] ColumnsAvrages(CudaDataSet data) {
+        
+        var vectors = data.Vectors;
+        float[] avg = new float[vectors.GetLength(1)];
+
+        for (int i = 0; i < vectors.GetLength(1); i++)
+        {
+            avg[i] = ColumnAvrage(vectors, i);
+        }
+
+        return avg;
+    }
 
     public static int[] CreateIndeces(CudaDataSet set) {
         int len = set.Classes.Length;

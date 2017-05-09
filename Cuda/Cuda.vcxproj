@@ -168,8 +168,11 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <CudaCompile Include="Common.cu" />
+    <CudaCompile Include="dimensionsReductions.cu" />
     <CudaCompile Include="drop3.cu" />
     <CudaCompile Include="evolutionary.cu" />
+    <CudaCompile Include="evolutionary2.cu" />
     <CudaCompile Include="kernel.cu" />
   </ItemGroup>
   <ItemGroup>

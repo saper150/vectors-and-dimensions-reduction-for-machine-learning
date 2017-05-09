@@ -184,33 +184,33 @@ extern "C" {
 
 
 
-	__global__ void createInitialPopulation(
-		const unsigned char* parent,
-		unsigned char* outputPopulation
-	) {
-		const int id = threadIdx.x + blockIdx.x * blockDim.x;
-		
-		if (id >= popSize) return;
+	//__global__ void createInitialPopulation(
+	//	const unsigned char* parent,
+	//	unsigned char* outputPopulation
+	//) {
+	//	const int id = threadIdx.x + blockIdx.x * blockDim.x;
+	//	
+	//	if (id >= popSize) return;
 
-		curandState state;
-		curand_init(clock64(), id,0, &state);
-		float a = curand_uniform(&state);
-		unsigned char* currentPopulation =
-			outputPopulation + (genLength*id);
-		
-		for (int i = 0; i < genLength; i++)
-		{
-			float chanceToFlip = parent[i] ? 0.2f : 0.1f;
+	//	curandState state;
+	//	curand_init(clock64(), id,0, &state);
+	//	float a = curand_uniform(&state);
+	//	unsigned char* currentPopulation =
+	//		outputPopulation + (genLength*id);
+	//	
+	//	for (int i = 0; i < genLength; i++)
+	//	{
+	//		float chanceToFlip = parent[i] ? 0.2f : 0.1f;
 
-			if (curand_uniform(&state) < chanceToFlip) {
-				currentPopulation[i] = !parent[i];
-			}
-			else {
-				currentPopulation[i] = parent[i];
-			}
-		}
+	//		if (curand_uniform(&state) < chanceToFlip) {
+	//			currentPopulation[i] = !parent[i];
+	//		}
+	//		else {
+	//			currentPopulation[i] = parent[i];
+	//		}
+	//	}
 
-	}
+	//}
 
 	__global__ void calculateAccuracy(
 			const int* testClasses,
@@ -253,52 +253,48 @@ extern "C" {
 
 
 
-	__global__ void calculateAccuracyRegresion(
-		const float* testValues,
-		const float* teachingValues,
-		const float* distances,
-		const unsigned char* populationGens,
-		float* accuracyes
-	) {
-		const int neaboursSize = teachingVectorsCount;
+	//__global__ void calculateAccuracyRegresion(
+	//	const float* testValues,
+	//	const float* teachingValues,
+	//	const float* distances,
+	//	const unsigned char* populationGens,
+	//	float* accuracyes
+	//) {
+	//	const int neaboursSize = teachingVectorsCount;
 
-		const int id = threadIdx.x + blockIdx.x * blockDim.x;
-		if (id >= testVectorsCount) return;
+	//	const int id = threadIdx.x + blockIdx.x * blockDim.x;
+	//	if (id >= testVectorsCount) return;
 
-		const int currentPopulationGenIndex = blockIdx.y;
+	//	const int currentPopulationGenIndex = blockIdx.y;
 
-		const unsigned char* currentGen =
-			populationGens + (genLength*currentPopulationGenIndex);
+	//	const unsigned char* currentGen =
+	//		populationGens + (genLength*currentPopulationGenIndex);
 
-		const int* currentNeaboursIndexes =
-			neaboursIndexes + (neaboursSize*id);
-
-
-		int neaboursFound = 0;
-		int correctCount = 0;
-		float guesedVal = 0;
-		for (int i = 0; i < neaboursSize && neaboursFound < k; i++)
-		{
-			const int p0 = currentNeaboursIndexes[i];
-			if (currentGen[p0]) {
-				neaboursFound++;
-				guesedVal += teachingValues[p0];
-			}
-		}
-
-		guesedVal /= (float)k;
-
-		const float diffrence = 
-			guesedVal - testValues[currentPopulationGenIndex];
-
-		accuracyes[currentPopulationGenIndex] 
-			= 1.f / sqrt(diffrence*diffrence);
-
-	}
+	//	const int* currentNeaboursIndexes =
+	//		neaboursIndexes + (neaboursSize*id);
 
 
+	//	int neaboursFound = 0;
+	//	int correctCount = 0;
+	//	float guesedVal = 0;
+	//	for (int i = 0; i < neaboursSize && neaboursFound < k; i++)
+	//	{
+	//		const int p0 = currentNeaboursIndexes[i];
+	//		if (currentGen[p0]) {
+	//			neaboursFound++;
+	//			guesedVal += teachingValues[p0];
+	//		}
+	//	}
 
+	//	guesedVal /= (float)k;
 
+	//	const float diffrence = 
+	//		guesedVal - testValues[currentPopulationGenIndex];
+
+	//	accuracyes[currentPopulationGenIndex] 
+	//		= 1.f / sqrt(diffrence*diffrence);
+
+	//}
 
 	__global__ void countVectors(
 		unsigned char* gens,
@@ -309,7 +305,6 @@ extern "C" {
 		//if (id >= popSize) return;
 
 		vectorSizes[id] = 0;
-
 		const unsigned char* currentGen = gens + genLength*id;
 
 		for (int i = 0; i < genLength; i++)
@@ -323,7 +318,7 @@ extern "C" {
 
 	__global__ void genetic(
 		const int* accuracy,
-		const int* vectorSizes,
+		const int* genLengths,
 		const float alpha,
 		const unsigned char* currentPopulation,
 		unsigned char* nextPopulation,
@@ -334,20 +329,19 @@ extern "C" {
 		float* fitness
 	) {
 		extern __shared__ int shared[];
-
 		int* turnamentWinners = (int*)shared;
 
 		const int id = threadIdx.x;
 
 		// calculating fitness
 		{
-			if (vectorSizes[id] <= k) {
+			if (genLengths[id] <= k) {
 				fitness[id] = 0;
 			}
 			else
 			{
 				const float a = alpha * accuracy[id] / avgAccuracy;
-				const float b = (1 - alpha) * avgGenLen / vectorSizes[id];
+				const float b = (1 - alpha) * avgGenLen / genLengths[id];
 				const float res = a + b;
 				fitness[id] = res*res;
 			}
@@ -414,10 +408,10 @@ extern "C" {
 		{
 			for (int i = 0; i < genLength; i++)
 			{
-				destination[i] = curand_uniform(&state) < mutationRate
-					? !destination[i] : destination[i];
+				if (curand_uniform(&state) < mutationRate) {
+					destination[i] = !destination[i];
+				}
 			}
-
 
 		}
 

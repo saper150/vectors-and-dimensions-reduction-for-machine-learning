@@ -1,4 +1,7 @@
 #pragma once
+
+#include <float.h>
+
 struct HeapData {
 	float val;
 	int label;
@@ -8,6 +11,14 @@ struct HeapCompare {
 		return d1.val < d2.val;
 	}
 };
+
+__device__ void initializeHeap(HeapData* heap,const int n) {
+	for (int i = 0; i < n; i++)
+	{
+		heap[i].val = FLT_MAX;
+	}
+}
+
 
 
 __device__ void hipify(HeapData* heap, int k) {
