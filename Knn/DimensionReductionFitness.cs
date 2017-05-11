@@ -7,12 +7,12 @@ using System.Text;
 using System.Threading.Tasks;
 
 
+
 interface IFitnessFunction
 {
     void CalculateFitness(CudaDeviceVariable<byte> population, CudaDeviceVariable<float> fitness);
-
+    string FitnessDetails(int index);
 }
-
 
 
 
@@ -24,7 +24,7 @@ class DimensionReductionFitness : IFitnessFunction
     CudaContext context;
 
     CudaKernel accuracyKernel;
-    CudaKernel countVectorsKernel;
+    CountVectorKernel countVectorsKernel;
     CudaKernel fitnessKernel;
 
     CudaDeviceVariable<int> deviceVectorSizes;
@@ -113,16 +113,6 @@ class DimensionReductionFitness : IFitnessFunction
 
 
 
-        countVectorsKernel = context.LoadKernel
-            (
-            "kernels/Common.ptx",
-            "countVectors"
-            );
-
-        countVectorsKernel.SetConstantVariable("genLength", teaching.attributeCount);
-        countVectorsKernel.BlockDimensions = popSize;
-        countVectorsKernel.GridDimensions = 1;
-
         deviceVectorSizes = new CudaDeviceVariable<int>(popSize);
 
 
@@ -132,23 +122,25 @@ class DimensionReductionFitness : IFitnessFunction
             );
         fitnessKernel.GridDimensions = 1;
         fitnessKernel.BlockDimensions = popSize;
-        fitnessKernel.SetConstantVariable("alpha", _alpha);
+        Alpha = 0.7f;
 
 
+        countVectorsKernel = new CountVectorKernel(context, popSize, teaching.attributeCount);
 
     }
 
 
     public void CalculateFitness(CudaDeviceVariable<byte> population, CudaDeviceVariable<float> fitness)
     {
+        Profiler.Start("vector sizes");
+        countVectorsKernel.Calculate(population, deviceVectorSizes);
+        Profiler.Stop("vector sizes");
 
-        countVectorsKernel.Run(
-            population.DevicePointer,
-            deviceVectorSizes.DevicePointer
-        );
-        int[] t = deviceVectorSizes;
-
+        Profiler.Start("clear accurracy memory");
         context.ClearMemory(deviceAccuracy.DevicePointer, 0, deviceAccuracy.SizeInBytes);
+        Profiler.Stop("clear accurracy memory");
+
+        Profiler.Start("accuracy kernel");
         accuracyKernel.Run(
             test.vectors.DevicePointer,
             test.classes.DevicePointer,
@@ -157,12 +149,18 @@ class DimensionReductionFitness : IFitnessFunction
             population.DevicePointer,
             deviceAccuracy.DevicePointer
             );
-        float[] a = deviceAccuracy;
 
+        Profiler.Stop("accuracy kernel");
 
+        Profiler.Start("Avrage Accuracy");
         float avrageAccuracy = Thrust.Avrage(deviceAccuracy);
-        float avrageVectorSize = Thrust.Avrage(deviceVectorSizes);
+        Profiler.Stop("Avrage Accuracy");
 
+        Profiler.Start("Avrage VectorSize");
+        float avrageVectorSize = Thrust.Avrage(deviceVectorSizes);
+        Profiler.Stop("Avrage VectorSize");
+
+        Profiler.Start("fitness kernel");
         fitnessKernel.Run(
             deviceAccuracy.DevicePointer,
             avrageAccuracy,
@@ -170,7 +168,16 @@ class DimensionReductionFitness : IFitnessFunction
             avrageVectorSize,
             fitness.DevicePointer
             );
-        float[] f = fitness;
+
+        Profiler.Stop("fitness kernel");
+    }
+
+    public string FitnessDetails(int index)
+    {
+        float[] hostAccuracy = deviceAccuracy;
+        int[] hostLength = deviceVectorSizes;
+
+        return $"accuracy: {hostAccuracy[index]} length: {hostLength[index]}";
 
     }
 }

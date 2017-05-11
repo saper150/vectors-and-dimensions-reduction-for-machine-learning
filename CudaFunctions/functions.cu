@@ -8,18 +8,11 @@
 #include <thrust/extrema.h>
 
 
+
 struct subject
 {
 	float fitness;
-	int accuracy;
-	int length;
-};
-
-struct subjectf
-{
-	float fitness;
-	float accuracy;
-	int length;
+	int index;
 };
 
 extern "C"
@@ -88,47 +81,19 @@ extern "C"
 		thrust::sequence(deviceValues, deviceValues + size);
 	}
 
-	
 
 	__declspec(dllexport)
 		subject FindFitest(
 			float* fitnesses,
-			int* accuracyes,
-			int* lengths,
+			int* sortedIndeces,
 			int size
 		) {
-		subject s;
-		thrust::device_ptr<float> deviceFitness(fitnesses);
-		auto max = thrust::max_element(deviceFitness, deviceFitness + size);
-		s.fitness = *max;
 
-		int position = max - deviceFitness;
-		cudaMemcpy(&s.accuracy, accuracyes + position, sizeof(int), cudaMemcpyDeviceToHost);
-		cudaMemcpy(&s.length, lengths + position, sizeof(int), cudaMemcpyDeviceToHost);
+		subject s;
+		cudaMemcpy(&s.index, sortedIndeces+size-1, sizeof(int), cudaMemcpyDeviceToHost);
+		cudaMemcpy(&s.fitness, fitnesses+size-1, sizeof(float), cudaMemcpyDeviceToHost);
 
 		return s;
 	}
-
-
-	__declspec(dllexport)
-		subject FindFitestf(
-			float* fitnesses,
-			float* accuracyes,
-			int* lengths,
-			int size
-		) {
-		subject s;
-		thrust::device_ptr<float> deviceFitness(fitnesses);
-		auto max = thrust::max_element(deviceFitness, deviceFitness + size);
-		s.fitness = *max;
-
-		int position = max - deviceFitness;
-		cudaMemcpy(&s.accuracy, accuracyes + position, sizeof(float), cudaMemcpyDeviceToHost);
-		cudaMemcpy(&s.length, lengths + position, sizeof(int), cudaMemcpyDeviceToHost);
-
-		return s;
-	}
-
-
 
 }

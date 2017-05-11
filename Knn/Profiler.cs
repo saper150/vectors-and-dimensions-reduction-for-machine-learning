@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 
-public class Profiler
+public static class Profiler
 {
     class Watch
     {
@@ -14,9 +14,9 @@ public class Profiler
         public List<TimeSpan> notedTimes = new List<TimeSpan>();
     }
 
-    Dictionary<string, Watch> watches = new Dictionary<string, Watch>();
+    static Dictionary<string, Watch> watches = new Dictionary<string, Watch>();
 
-    public void Start(string watch) {
+    public static void Start(string watch) {
         if (!watches.ContainsKey(watch))
         {
             watches[watch] = new Watch();
@@ -24,20 +24,25 @@ public class Profiler
         watches[watch].w.Start();
     }
 
-    public void Stop(string watch) {
+    public static void Stop(string watch) {
         var w = watches[watch];
         w.notedTimes.Add(w.w.Elapsed);
         w.w.Reset();
     }
 
-    public void Print() {
+    public static void Print() {
 
         foreach (var item in watches)
         {
             var times = item.Value.notedTimes;
+
+            var sorted = times.OrderBy(x => x.TotalMilliseconds).ToArray();
+            var mediana = sorted[sorted.Length/2];
+
             Console.WriteLine("-------------");
             Console.WriteLine($"name:\t{item.Key}");
-            Console.WriteLine($"avrageTime:\t{times.Average(x=>x.Milliseconds)}");
+            Console.WriteLine($"avrageTime:\t{times.Average(x=>x.TotalMilliseconds)}");
+            Console.WriteLine($"mediana:\t{mediana}");
             Console.WriteLine($"max time:\t{times.Max()}");
             Console.WriteLine($"min time:\t{times.Min()}");
             Console.WriteLine($"executedTimes:\t{times.Count()}");

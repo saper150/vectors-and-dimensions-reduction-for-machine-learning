@@ -7,34 +7,16 @@
 #include <float.h>
 #include <thrust/sort.h>
 
-#include <curand.h>
-#include <curand_kernel.h>
-
 #include <time.h>
 #include <math.h>
 #include"qSort.h"
 
-__device__ int uniform_int(
-	curandState& state,
-	const int high
-) {
-	const float randomF = curand_uniform(&state)*(high + 0.99999f);
-	return (int)truncf(randomF);
-}
+#include "uniform_int.h"
 
 
 extern "C" {
 
-
-	__constant__ int popSize;
 	__constant__ int genLength;
-
-	__constant__ int mutationRate;
-	__constant__ int crossoverRate;
-	__constant__ float alpha;
-
-
-
 
 
 	__global__ void countVectors(
@@ -56,6 +38,12 @@ extern "C" {
 
 	}
 
+	__constant__ int popSize;
+	__constant__ float mutationRate;
+	__constant__ float crossoverRate;
+	__constant__ float alpha;
+
+	__constant__ int eliteIndex;
 
 	__global__ void genetic(
 		const unsigned char* currentPopulation,
@@ -71,6 +59,8 @@ extern "C" {
 		curandState state;
 		curand_init(clock64(), id, 0, &state);
 
+
+
 		//turnament selection
 		{
 			const int other = uniform_int(state, popSize - 1);
@@ -80,8 +70,15 @@ extern "C" {
 
 
 		__syncthreads();
-
+ 
 		unsigned char* destination = nextPopulation + genLength*id;
+
+		if (id >= eliteIndex) {
+			const unsigned char * eliteParent = currentPopulation + fitnessIndeces[id];
+			memcpy(destination, eliteParent, genLength);
+			return;
+		}
+
 		//crossover
 		{
 
@@ -94,14 +91,31 @@ extern "C" {
 			const unsigned char* firstParent =
 				currentPopulation + turnamentWinners[parent1Index] * genLength;
 
-			const unsigned char* secondParent =
+ 			const unsigned char* secondParent =
 				currentPopulation + turnamentWinners
 				[
 					crossoverChance < crossoverRate ? parent2Index : parent1Index
-				] * genLength;
+				] * genLength + crossoverPoint;
 
-			memcpy(destination, firstParent, crossoverPoint);
-			memcpy(destination + crossoverPoint, secondParent + crossoverPoint, genLength - crossoverPoint);
+			unsigned char* destinationSecondPart = destination + crossoverPoint;
+
+			for (int i = 0; i < crossoverPoint; i++)
+			{
+				destination[i] = firstParent[i];
+			}
+
+			//unsigned char* secondPartDestination = destination + crossoverPoint;
+			//const unsigned char* secondPartOfSecondParent = secondParent+ crossoverPoint;
+
+			const int count = genLength - crossoverPoint;
+			for (int i = 0; i < count; i++)
+			{
+				destinationSecondPart[i] = secondParent[i];
+			}
+
+
+			//memcpy(destination, firstParent, crossoverPoint);
+			//memcpy(destination + crossoverPoint, secondParent + crossoverPoint, genLength - crossoverPoint);
 
 			/*
 			if (r < crossoverRate) {

@@ -96,59 +96,128 @@ class Program
 
     }
 
+    public static FlattArray<byte> CreateRandomPopulation(int popSize, int genLength)
+    {
+        FlattArray<byte> population =
+            new FlattArray<byte>(popSize, genLength);
+        Random r = new Random();
+
+        for (int i = 0; i < population.GetLength(0); i++)
+        {
+            for (int j = 0; j < population.GetLength(1); j++)
+            {
+                population[i, j] = r.NextDouble() < 0.5 ? (byte)1 : (byte)0;
+            }
+        }
+        return population;
+
+    }
+
+
+    public static FlattArray<byte> CreatePopulationBasedOnParent(byte[] parent, int popSize, float flippChance, float bias)
+    {
+
+        FlattArray<byte> population =
+             new FlattArray<byte>(popSize, parent.Length);
+        Random r = new Random();
+
+
+        for (int i = 0; i < population.GetLength(0); i++)
+        {
+            for (int j = 0; j < population.GetLength(1); j++)
+            {
+                float chance = population[i, j] == 1 ? flippChance : flippChance - bias;
+                population[i, j] = r.NextDouble() < chance ? (byte)1 : (byte)0;
+            }
+        }
+
+        return population;
+
+    }
+
+
+
     static void Main(string[] args)
     {
 
 
 
 
-            System.Globalization.CultureInfo customCulture = (System.Globalization.CultureInfo)System.Threading.Thread.CurrentThread.CurrentCulture.Clone();
+        System.Globalization.CultureInfo customCulture = (System.Globalization.CultureInfo)System.Threading.Thread.CurrentThread.CurrentCulture.Clone();
         customCulture.NumberFormat.NumberDecimalSeparator = ".";
         System.Threading.Thread.CurrentThread.CurrentCulture = customCulture;
 
-        var data = DataSetHelper.readIris();
+
+        var data = DataSetHelper.ReadMagic();
         DataSetHelper.Normalize(data);
         DataSetHelper.Shuffle(data);
         var splited = DataSetHelper.Split(data, new float[] { 0.75f, 0.25f });
 
-        //  e.CalculateClasses(splited[0], splited[1]);
-
         splited[0].ResetIndeces();
 
-        //Drop3 drop = new Drop3();
-        //drop.CasheSize = 5;
-        //drop.K = 3;
-        //var indexesToStay = drop.Apply(splited[0]);
-        //var teaching = splited[0].Filter(indexesToStay);
-
-        //var parentGen = new byte[splited[0].Classes.Length];
-        //foreach (var item in indexesToStay)
-        //{
-        //    parentGen[item] = 1;
-        //}
-        var p = new byte[] {1,1,1,1 };
 
         int popSize = 100;
 
         using (CudaContext context = new CudaContext())
         {
+
             DeviceDataSet teaching = new DeviceDataSet(splited[0]);
-            DeviceDataSet test= new DeviceDataSet(splited[1]);
+            DeviceDataSet test = new DeviceDataSet(splited[1]);
 
 
-            IFitnessFunction fitnessFunc = new DimensionReductionFitness(context, teaching, test, popSize);
+            FlattArray<byte> initialPopulation;
+            IFitnessFunction fitnessFunc;
 
 
-                var d = new Evolutionary2(context, fitnessFunc, popSize, p);
+            {
+                fitnessFunc =
+                    new VectorReductionFitness(context, teaching, test, popSize)
+                    {
+                        Alpha = 0.7f
+                    };
+
+                Drop3 drop = new Drop3();
+                drop.CasheSize = 5;
+                drop.K = 3;
+
+                Profiler.Start("Drop3");
+                var indexesToStay = drop.Apply(splited[0], context);
+                Profiler.Stop("Drop3");
+
+
+                byte[] parrent = new byte[splited[0].Vectors.GetLength(0)];
+                foreach (var item in indexesToStay)
+                {
+                    parrent[item] = 1;
+                }
+
+                initialPopulation = CreatePopulationBasedOnParent(parrent, popSize, 0.2f, 0.05f);
+
+            }
+
+
+
+            //{
+
+            //    fitnessFunc = new DimensionReductionFitness(context, teaching,test,popSize);
+            //    initialPopulation = CreateRandomPopulation(popSize, teaching.attributeCount);
+
+
+            //}
+
+            var d = new Evolutionary2(context, fitnessFunc, initialPopulation);
+            for (int i = 0; i < 100; i++)
+            {
+                Profiler.Start("iteration");
+                d.CreateNewPopulation();
+                Profiler.Stop("iteration");
+
+            }
+            var best = d.FindFitest();
+            Console.WriteLine(fitnessFunc.FitnessDetails(best.index));
+            Profiler.Print();
 
         }
-
-
-        //Evolutionary e = new Evolutionary(splited[0],splited[1],100,null);
-      //  var res = Knn(teaching, splited[1], 3);
-
-        //Console.WriteLine(1- teaching.Classes.Length/(float) splited[0].Classes.Length);
-        //Console.WriteLine(res);
 
 
     }

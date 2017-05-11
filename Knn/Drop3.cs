@@ -33,13 +33,13 @@ class NeighborFinder : IDisposable
     int vectorCount;
     int attrCount;
     float[] results;
-    public NeighborFinder(FlattArray<float> vectors,int countToFind)
+    public NeighborFinder(CudaContext context, FlattArray<float> vectors,int countToFind)
     {
 
         heap = new Data[countToFind];
         this.vectorCount = vectors.GetLength(0);
         this.attrCount= vectors.GetLength(1);
-        context = new CudaContext();
+        this.context = context;
 
         kernel = context.LoadKernel("kernels/drop3.ptx", "calculateDistances");
         kernel.GridDimensions = vectors.GetLength(0) / 256 + 1;
@@ -98,13 +98,12 @@ class NeighborFinder : IDisposable
 
     }
 
-
     public void Dispose()
     {
-        context.Dispose();
-        
+        deviceVectors.Dispose();
+        deviceResult.Dispose();
+        deviceIsInDataSet.Dispose();
     }
-
 }
 
 
@@ -128,10 +127,17 @@ public class Drop3
         EnnCountToPass = 2;
     }
 
-    public int[] Apply(CudaDataSet data)
+    public int[] Apply(CudaDataSet data,CudaContext context)
     {
-        var ennFiltered = Enn(data);
-        return ApplyRest(ennFiltered);
+        Profiler.Start("Enn");
+        var ennFiltered = Enn(data,context);
+        Profiler.Stop("Enn");
+
+        Profiler.Start("drop3 rest");
+        var rest = ApplyRest(context, ennFiltered);
+        Profiler.Stop("drop3 rest");
+
+        return rest;
     }
 
     public static void SortDataDesc(HostDataset host,int[][] nearestNeabours,float[] sortBy)
@@ -140,72 +146,61 @@ public class Drop3
         Sorting.sortAndRemapDesc(nearestNeabours, sortBy);
     }
 
-    private int[] ApplyRest(CudaDataSet data)
+    private int[] ApplyRest(CudaContext context,CudaDataSet data)
     {
 
-        #region findingNeighbors
 
         int vectorsCount = data.Vectors.GetLength(0);
         int attributeCount = data.Vectors.GetLength(1);
 
-        CudaContext context = new CudaContext();
         var kernel = context.LoadKernel("kernels/drop3.ptx", "findNeighbours");
         kernel.GridDimensions = data.Vectors.GetLength(0) / ThreadsPerBlock + 1;
         kernel.BlockDimensions = ThreadsPerBlock;
 
-        CudaDeviceVariable<float> vectors = data.Vectors.Raw;
-        CudaDeviceVariable<int> d_classes = data.Classes;
-
-
-        CudaDeviceVariable<HeapData> heapMemory =
-            new CudaDeviceVariable<HeapData>(data.Vectors.GetLength(0) * CasheSize);
-
-        CudaDeviceVariable<float> nearestEnemyDistances =
-            new CudaDeviceVariable<float>(data.Vectors.GetLength(0));
-
-        kernel.Run(
-            vectors.DevicePointer,
-            data.Vectors.GetLength(0),
-            data.Vectors.GetLength(1),
-            CasheSize,
-            d_classes.DevicePointer,
-            heapMemory.DevicePointer,
-            nearestEnemyDistances.DevicePointer
-            );
-        #endregion
-
-
-        #region sortingByDistanceToNearestEneamy
-
-        float[] hostNearestEnemy = nearestEnemyDistances;
-        float[][] hostVectors = data.Vectors.To2d();
-
-        var Neighbors = new FlattArray<HeapData>(heapMemory, CasheSize);
-        var nearestNeighbors = new int[vectorsCount][];
-        for (int i = 0; i < vectorsCount; i++)
+        using (CudaDeviceVariable<int> d_classes = data.Classes)
+        using (CudaDeviceVariable<float> vectors = data.Vectors.Raw)
+        using (var heapMemory = new CudaDeviceVariable<HeapData>(data.Vectors.GetLength(0) * CasheSize))
+        using (var nearestEnemyDistances = new CudaDeviceVariable<float>(data.Vectors.GetLength(0)))
         {
-            nearestNeighbors[i] = new int[CasheSize];
 
-            for (int j = 0; j < CasheSize; j++)
+            kernel.Run(
+                vectors.DevicePointer,
+                data.Vectors.GetLength(0),
+                data.Vectors.GetLength(1),
+                CasheSize,
+                d_classes.DevicePointer,
+                heapMemory.DevicePointer,
+                nearestEnemyDistances.DevicePointer
+                );
+
+
+
+            float[] hostNearestEnemy = nearestEnemyDistances;
+            float[][] hostVectors = data.Vectors.To2d();
+
+            var Neighbors = new FlattArray<HeapData>(heapMemory, CasheSize);
+            var nearestNeighbors = new int[vectorsCount][];
+            for (int i = 0; i < vectorsCount; i++)
             {
-                nearestNeighbors[i][j] = Neighbors[i, j].label;
+                nearestNeighbors[i] = new int[CasheSize];
+
+                for (int j = 0; j < CasheSize; j++)
+                {
+                    nearestNeighbors[i][j] = Neighbors[i, j].label;
+                }
             }
+
+            HostDataset host = data.ToHostDataSet();
+            SortDataDesc(host, nearestNeighbors, hostNearestEnemy);
+
+
+            return proccesData(context, host, nearestNeighbors);
+
         }
-
-        HostDataset host = data.ToHostDataSet();
-        SortDataDesc(host, nearestNeighbors, hostNearestEnemy);
-
-        #endregion
-
-        context.Dispose();
-
-       return proccesData(host,nearestNeighbors);
-
-
 
     }
 
-    int[] proccesData( HostDataset host,int[][] nearestNeighbors)
+    int[] proccesData(CudaContext context, HostDataset host,int[][] nearestNeighbors)
     {
 
         int len = host.Vectors.Length;
@@ -227,7 +222,7 @@ public class Drop3
             nextNearestNabour[i] = K + 1;
             nearestNaboursSizes[i] = initialCasheSize+K;
         }
-        NeighborFinder finder = new NeighborFinder(new FlattArray<float>(host.Vectors), initialCasheSize/2);
+        NeighborFinder finder = new NeighborFinder(context,new FlattArray<float>(host.Vectors), initialCasheSize/2);
 
         Func<int, int, int> isClasifiedCorectly =
             (int vectorToCheck, int removed) =>
@@ -330,58 +325,55 @@ public class Drop3
                 indecesInDataSet.Add(host.OrginalIndeces[i]);
             }
         }
-        return indecesInDataSet.ToArray();
-        //finder.Dispose();
-        //var filteredVectors = vectors.Filter(isInDaaset.Select(x=>x==0 ? false : true).ToArray());
-        //var filteredClasses = classes.Filter(isInDaaset.Select(x => x == 0 ? false : true).ToArray());
 
-        //return new CudaDataSet()
-        //{
-        //    Vectors = new FlattArray<float>(filteredVectors),
-        //    Classes = filteredClasses
-        //};
+
+        finder.Dispose();
+
+        return indecesInDataSet.ToArray();
 
     }
 
 
-    CudaDataSet Enn(CudaDataSet data)
+    CudaDataSet Enn(CudaDataSet data,CudaContext context)
     {
 
-        CudaContext context = new CudaContext();
         var kernel = context.LoadKernel("kernels/kernel.ptx", "enn");
         kernel.GridDimensions = data.Vectors.GetLength(0) / ThreadsPerBlock + 1;
         kernel.BlockDimensions = ThreadsPerBlock;
 
-        CudaDeviceVariable<float> vectors = data.Vectors.Raw;
-        CudaDeviceVariable<int> classes = data.Classes;
-        CudaDeviceVariable<HeapData> heapMemory = 
-            new CudaDeviceVariable<HeapData>(data.Vectors.GetLength(0) * K);
-        CudaDeviceVariable<byte> result = 
-            new CudaDeviceVariable<byte>(data.Vectors.GetLength(0));
 
-        kernel.Run(
-            vectors.DevicePointer,
-            data.Vectors.GetLength(0),
-            data.Vectors.GetLength(1),
-            classes.DevicePointer,
-            K,
-            EnnCountToPass,
-            heapMemory.DevicePointer,
-            result.DevicePointer
-            );
-
-        byte[] hostResult = result;
-        List<int> indeces = new List<int>();
-        for (int i = 0; i < hostResult.Length; i++)
+        using (CudaDeviceVariable<float> vectors = data.Vectors.Raw)
+        using (CudaDeviceVariable<int> classes = data.Classes)
+        using (var heapMemory = new CudaDeviceVariable<HeapData>(data.Vectors.GetLength(0) * K))
+        using (var result = new CudaDeviceVariable<byte>(data.Vectors.GetLength(0)))
         {
-            if (hostResult[i] == 1) {
-                indeces.Add(i);
+
+            kernel.Run(
+                vectors.DevicePointer,
+                data.Vectors.GetLength(0),
+                data.Vectors.GetLength(1),
+                classes.DevicePointer,
+                K,
+                EnnCountToPass,
+                heapMemory.DevicePointer,
+                result.DevicePointer
+                );
+
+            byte[] hostResult = result;
+            List<int> indeces = new List<int>();
+            for (int i = 0; i < hostResult.Length; i++)
+            {
+                if (hostResult[i] == 1) {
+                    indeces.Add(i);
+                }
             }
+
+            return data.Filter(hostResult.createIndexesToStay());
+
         }
 
-        context.Dispose();
 
-        return data.Filter(hostResult.createIndexesToStay());
+
 
     }
 

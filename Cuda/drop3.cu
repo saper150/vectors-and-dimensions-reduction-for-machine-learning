@@ -18,6 +18,24 @@
 
 extern "C" {
 
+
+
+
+
+	__global__ void fitness(
+	
+	) {
+	
+	
+	}
+
+
+
+
+
+
+
+
 	__global__ void findNeighbours(
 		float * vectors,
 		int vectorCount,

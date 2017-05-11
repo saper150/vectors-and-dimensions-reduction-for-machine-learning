@@ -88,7 +88,7 @@ extern "C" {
 				correctCount++;
 			}
 		}
-
+		delete heap;
 		if (correctCount >= countToPass) {
 			atomicAdd(accuracy + blockIdx.y, 1.0f);
 		}

@@ -120,7 +120,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AccuracyCalculator.cs" />
+    <Compile Include="CountVectorKernel.cs" />
+    <Compile Include="DimensionReductionFitness.cs" />
     <Compile Include="ArrayExtensions.cs" />
     <Compile Include="Drop3.cs" />
     <Compile Include="Evolutionary.cs" />
@@ -138,6 +139,7 @@
     </Compile>
     <Compile Include="Thrust.cs" />
     <Compile Include="Utils.cs" />
+    <Compile Include="VectorReductionFitness.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
@@ -165,13 +167,13 @@
     <None Include="kernels\drop3.ptx">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Include="kernels\evolutionary.ptx">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
     <None Include="kernels\evolutionary2.ptx">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Include="kernels\kernel.ptx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="kernels\VectorReduction.ptx">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Include="packages.config" />
