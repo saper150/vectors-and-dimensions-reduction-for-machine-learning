@@ -171,7 +171,6 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     <CudaCompile Include="Common.cu" />
     <CudaCompile Include="dimensionsReductions.cu" />
     <CudaCompile Include="drop3.cu" />
-    <CudaCompile Include="__evolutionary.cu" />
     <CudaCompile Include="evolutionary2.cu" />
     <CudaCompile Include="kernel.cu" />
     <CudaCompile Include="VectorReduction.cu" />
