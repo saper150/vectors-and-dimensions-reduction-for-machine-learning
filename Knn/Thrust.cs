@@ -78,5 +78,17 @@ public static class Thrust
         sequence(values.DevicePointer.Pointer, values.Size);
     }
 
+
+    [DllImport("kernels/CudaFunctions.dll", EntryPoint = "sort_by_key_multiple")]
+    static extern void sort_by_key_multiple(ManagedCuda.BasicTypes.SizeT keys, ManagedCuda.BasicTypes.SizeT values, int col,int row);
+
+    public static void sort_by_key_multiple(CudaDeviceVariable<float> keys,CudaDeviceVariable<int> values,int col,int row)
+    {
+        sort_by_key_multiple(keys.DevicePointer.Pointer, values.DevicePointer.Pointer, col, row);
+
+    }
+
+
+
 }
 

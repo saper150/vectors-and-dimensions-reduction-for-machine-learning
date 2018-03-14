@@ -17,13 +17,13 @@ public struct Data
 public class Sorting
 {
 
-    private static CudaDataSet copyResult(CudaDataSet src, int[] sorted)
+    private static CudaDataSet<T> copyResult<T>(CudaDataSet<T> src, int[] sorted)
     {
 
         FlattArray<float> newArr =
             new FlattArray<float>(src.Vectors.GetLength(0), src.Vectors.GetLength(1));
 
-        int[] newClasses = new int[src.Vectors.GetLength(0)];
+        T[] newVal = new T[src.Vectors.GetLength(0)];
 
         int attrCount = src.Vectors.GetLength(1);
         Parallel.For(0, sorted.Length, i =>
@@ -36,14 +36,14 @@ public class Sorting
                 attrCount
                 );
 
-            newClasses[i] = src.Classes[sorted[i]];
+            newVal[i] = src.Classes[sorted[i]];
 
         });
 
-        return new CudaDataSet()
+        return new CudaDataSet<T>()
         {
             Vectors = newArr,
-            Classes = newClasses
+            Classes = newVal
         };
 
     }
@@ -148,13 +148,13 @@ public class Sorting
         return copyData(toSort, SortingIndecesDesc(sortBy));
     }
 
-    public static CudaDataSet Sort(CudaDataSet toSort, float[] sortBy)
+    public static CudaDataSet<T> Sort<T>(CudaDataSet<T> toSort, float[] sortBy)
     {
 
         return copyResult(toSort, SortingIndeces(sortBy));
 
     }
-    public static CudaDataSet SortDesc(CudaDataSet toSort, float[] sortBy)
+    public static CudaDataSet<T> SortDesc<T>(CudaDataSet<T> toSort, float[] sortBy)
     {
 
         return copyResult(toSort, SortingIndecesDesc(sortBy));

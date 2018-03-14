@@ -6,6 +6,14 @@ using System.Text;
 using System.Threading.Tasks;
 
 
+public enum Type
+{
+    param,
+    label,
+    skip
+}
+
+
 public class LabelReader
 {
 
@@ -18,11 +26,11 @@ public class LabelReader
     public int rowCount { get; set; }
 
 
-    public CudaDataSet DataSet
+    public CudaDataSet<int> DataSet
     {
         get
         {
-            var set =new CudaDataSet
+            var set =new CudaDataSet<int>
             {
                 Vectors = new FlattArray<float>(
                     f.ToArray(),
@@ -35,12 +43,7 @@ public class LabelReader
     }
 
 
-    public enum Type
-    {
-        param,
-        label,
-        skip
-    }
+    
     int dictionaryIndex = 0;
 
     Type[] description;
@@ -95,6 +98,97 @@ public class LabelReader
 
     }
 
+
+    public void ReadFile(string fileName)
+    {
+        using (var reader = new StreamReader(fileName))
+        {
+            if (Header)
+            {
+                reader.ReadLine();
+            }
+
+            while (!reader.EndOfStream)
+            {
+                rowCount++;
+                ReadRow(reader.ReadLine());
+            }
+
+        }
+    }
+
+}
+
+
+
+public class RegresionReader
+{
+
+    public char Separator { get; set; }
+    public bool Header { get; set; }
+
+
+    List<float> ValuesList = new List<float>();
+    public int rowCount { get; set; }
+
+
+    public CudaDataSet<float> DataSet
+    {
+        get
+        {
+            var set = new CudaDataSet<float>
+            {
+                Vectors = new FlattArray<float>(
+                    f.ToArray(),
+                    description.Where(x => x == Type.param).Count()),
+                Classes = ValuesList.ToArray()
+            };
+            set.orginalIndeces = DataSetHelper.CreateIndeces(set);
+            return set;
+        }
+    }
+
+    int dictionaryIndex = 0;
+
+    Type[] description;
+    int descriptionLen;
+    int paramCount;
+
+    public RegresionReader(Type[] description)
+    {
+        Separator = ',';
+        Header = false;
+        if (description.Where(x => x == Type.label).Count() != 1)
+        {
+            throw new Exception("Label count is not 1");
+        }
+        this.description = description;
+        descriptionLen = description.Length;
+
+        paramCount = description.Where(x => x == Type.param).Count();
+
+    }
+
+    List<float> f = new List<float>();
+    void ReadRow(string row)
+    {
+        var splited = row.Split(Separator).ToList();
+
+        for (int i = 0; i < descriptionLen; i++)
+        {
+            if (description[i] == Type.param)
+            {
+                f.Add(float.Parse(splited[i]));
+
+            }
+            else if (description[i] == Type.label)
+            {
+                ValuesList.Add(float.Parse(splited[i]));
+            }
+
+        }
+
+    }
 
     public void ReadFile(string fileName)
     {

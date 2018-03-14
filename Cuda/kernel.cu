@@ -19,13 +19,13 @@ extern "C"
 		int* labels,
 		int vectorLen,
 		int k,
-		HeapData* heapMemory
+		HeapData<int>* heapMemory
 	)
 	{
 		const int id = blockIdx.x*blockDim.x + threadIdx.x;
 		if (id >= testCount) return;
 
-		HeapData* heap = heapMemory + (id*k);
+		HeapData<int>* heap = heapMemory + (id*k);
 
 		const float* currentRow = testVectors + (vectorLen*id);
 
@@ -63,7 +63,7 @@ extern "C"
 		int* classes,
 		int k,
 		int countToPass,
-		HeapData* heapMemory,
+		HeapData<int>* heapMemory,
 		unsigned char* result
 		) 
 	{
@@ -71,7 +71,7 @@ extern "C"
 		const int id = blockIdx.x*blockDim.x + threadIdx.x;
 		if (id >= vectorCount) return;
 
-		HeapData* heap = heapMemory + (id*k);
+		HeapData<int>* heap = heapMemory + (id*k);
 
 		const float* currentRow = vectors + (atributeCount*id);
 

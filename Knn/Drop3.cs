@@ -127,7 +127,7 @@ public class Drop3
         EnnCountToPass = 2;
     }
 
-    public int[] Apply(CudaDataSet data,CudaContext context)
+    public int[] Apply(CudaDataSet<int> data,CudaContext context)
     {
         Profiler.Start("Enn");
         var ennFiltered = Enn(data,context);
@@ -146,7 +146,7 @@ public class Drop3
         Sorting.sortAndRemapDesc(nearestNeabours, sortBy);
     }
 
-    private int[] ApplyRest(CudaContext context,CudaDataSet data)
+    private int[] ApplyRest(CudaContext context,CudaDataSet<int> data)
     {
 
 
@@ -334,7 +334,7 @@ public class Drop3
     }
 
 
-    CudaDataSet Enn(CudaDataSet data,CudaContext context)
+    CudaDataSet<int> Enn(CudaDataSet<int> data,CudaContext context)
     {
 
         var kernel = context.LoadKernel("kernels/kernel.ptx", "enn");

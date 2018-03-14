@@ -40,7 +40,7 @@ class CountVectorKernel
     public CountVectorKernel(CudaContext context, int vectorCount, int genLength)
     {
         this.context = context;
-        kernel = context.LoadKernel("kernels/evolutionary2.ptx", "countVectors");
+        kernel = context.LoadKernel("kernels/Common.ptx", "countVectors");
         VectorCount = vectorCount;
         GenLength = genLength;
         kernel.GridDimensions = 1;
@@ -50,7 +50,6 @@ class CountVectorKernel
     public void Calculate(CudaDeviceVariable<byte> toCalc, CudaDeviceVariable<int> result)
     {
         kernel.Run(toCalc.DevicePointer, result.DevicePointer);
-
     }
 
 }

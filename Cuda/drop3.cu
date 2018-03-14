@@ -42,7 +42,7 @@ extern "C" {
 		int atributeCount,
 		int neighborCount,
 		int* classes,
-		HeapData* heapMemory,
+		HeapData<int>* heapMemory,
 		float* nearestEnemyDistance
 	) {
 
@@ -51,7 +51,7 @@ extern "C" {
 
 		nearestEnemyDistance[id] = FLT_MAX;
 
-		HeapData* heap = heapMemory + (id*neighborCount);
+		HeapData<int>* heap = heapMemory + (id*neighborCount);
 
 		const float* currentRow = vectors + (atributeCount*id);
 

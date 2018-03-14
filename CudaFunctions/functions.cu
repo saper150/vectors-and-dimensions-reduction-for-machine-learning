@@ -6,6 +6,7 @@
 
 #include <thrust\device_vector.h>
 #include <thrust/extrema.h>
+#include <thrust/system/cuda/execution_policy.h>
 
 
 
@@ -80,6 +81,35 @@ extern "C"
 		thrust::device_ptr<int> deviceValues(values);
 		thrust::sequence(deviceValues, deviceValues + size);
 	}
+
+	__declspec(dllexport)
+		void sort_by_key_multiple(float* keys, int* values,int col,int row) {
+		thrust::device_ptr<float> deviceKeys(keys);
+		thrust::device_ptr<int> deviceValues(values);
+
+		std::vector<cudaStream_t> streams;
+		streams.resize(row);
+		for (int i = 0; i < row; i++)
+		{
+			cudaStreamCreate(&streams[i]);
+		}
+
+		for (int i = 0; i < row; i++)
+		{
+			const auto currentKeys = deviceKeys + i*col;
+			const auto currentValues = deviceValues+ i*col;
+			thrust::sort_by_key(thrust::cuda::par.on(streams[i]), currentKeys, currentKeys + col, currentValues);
+		}
+
+		for (auto& stream : streams) {
+			cudaStreamSynchronize(stream);
+		}
+		for (auto& stream : streams) {
+			cudaStreamDestroy(stream);
+		}
+
+	}
+
 
 
 	__declspec(dllexport)

@@ -19,21 +19,48 @@ extern "C" {
 		unsigned char* gens,
 		int* vectorSizes
 	) {
+		
+		const int id = threadIdx.x;
+		//if (id >= popSize) return;
+
+		//vectorSizes[id] = 0;
+		int size = 0;
+		const unsigned char* currentGen = gens + genLength*id;
+		for (int i = 0; i < genLength; i++)
+		{
+
+			if (currentGen[i])
+				size++;
+		}
+		vectorSizes[id] = size;
+
+	}
+
+
+
+
+
+	__global__ void countVectorsIndeces(
+		unsigned char* gens,
+		int* indeces,
+		int* vectorSizes
+	) {
 
 		const int id = threadIdx.x + blockIdx.x * blockDim.x;
 		//if (id >= popSize) return;
 
 		vectorSizes[id] = 0;
+		int* currentIndeces = indeces + genLength*id;
 		const unsigned char* currentGen = gens + genLength*id;
 
 		for (int i = 0; i < genLength; i++)
 		{
-			if (currentGen[i])
+			if (currentGen[i]) {
+				currentIndeces[vectorSizes[id]] = i;
 				vectorSizes[id]++;
+			}
 		}
 
 	}
-
-
 
 }

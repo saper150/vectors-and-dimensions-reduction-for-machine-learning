@@ -4,6 +4,9 @@
 #include "HeapData.h"
 #include <math.h>
 
+#include <float.h>
+#include "splitCopy.h"
+
 extern "C" {
 
 	__constant__ int popSize;
@@ -40,45 +43,71 @@ extern "C" {
 
 
 
+
+
 	__global__ void geneticKnn(
 		const float* testVectors,
 		const int* testClasses,
 		const float* teachingVectors,
 		const int* teachingClasses,
-		const unsigned char* population,
+		const int* vectorSizes,
+		const int* populationIndeces,
+		unsigned char* isInCashe,
+		HeapData<int>* heapMemory,
 		float* accuracy
 
 	)
 	{
+		__shared__ int indecesCashe[1000];
+
+		const int currentVectorSize = vectorSizes[blockIdx.y];
+
+		{
+			const int* currentIndeces = populationIndeces + atributeCount*blockIdx.y;
+			splitCopy(indecesCashe, currentIndeces, currentVectorSize);
+			__syncthreads();
+		}
 
 		const int id = threadIdx.x + blockIdx.x * blockDim.x;
 		if (id >= testVectorsCount) return;
 
-		const unsigned char* currentGen = population + atributeCount*blockIdx.y;
-		const float* currentVector = testVectors + atributeCount*id;
+		if (isInCashe[blockIdx.y]) {
+			return;
+		}
 
-		HeapData* heap = new HeapData[k];
+		const float* currentVector = testVectors + atributeCount*id;
+		float currentVectorCashe[200];
+		for (int i = 0; i < atributeCount; i++)
+		{
+			currentVectorCashe[i] = currentVector[i];
+		}
+
+
+		int a = (threadIdx.y*k*testVectorsCount) + (id*k);
+		HeapData<int> * heap =  heapMemory + (blockIdx.y*k*testVectorsCount) + (id*k);
 
 		initializeHeap(heap, k);
 
 		for (int i = 0; i < teachingVectorsCount; i++)
 		{
-			const float* other = teachingVectors + atributeCount*i;
+
+			const float* currentOther = teachingVectors + atributeCount*i;
 			float result = 0;
-			for (int j = 0; j < atributeCount; j++)
+			for (int j = 0; j < currentVectorSize; j++)
 			{
-				if (currentGen[j]) {
-					const float diffrence = currentVector[j] - other[j];
-					result += diffrence*diffrence;
-				}
+				const int indece = indecesCashe[j];
+				const float diffrence = currentVectorCashe[indece] - currentOther[indece];
+				result += diffrence*diffrence;	
 			}
 
 			result = sqrt(result);
+
 			if (result < heap[0].val) {
 				heap[0].val = result;
 				heap[0].label = teachingClasses[i];
 				hipify(heap, k);
 			}
+
 		}
 
 		int correctCount = 0;
@@ -88,7 +117,7 @@ extern "C" {
 				correctCount++;
 			}
 		}
-		delete heap;
+
 		if (correctCount >= countToPass) {
 			atomicAdd(accuracy + blockIdx.y, 1.0f);
 		}
@@ -96,4 +125,227 @@ extern "C" {
 	}
 
 
+
+
+
+
+
+
+	__global__ void geneticKnnRegresion(
+		const float* testVectors,
+		const float* testValues,
+		const float* teachingVectors,
+		const float* teachingValues,
+		const int* vectorSizes,
+		const int* populationIndeces,
+		unsigned char* isInCashe,
+		HeapData<float>* heapMemory,
+		float* squaredDiff
+
+	)
+	{
+		__shared__ int indecesCashe[1000];
+
+		const int currentVectorSize = vectorSizes[blockIdx.y];
+
+		{
+			const int* currentIndeces = populationIndeces + atributeCount*blockIdx.y;
+			splitCopy(indecesCashe, currentIndeces, currentVectorSize);
+			__syncthreads();
+		}
+
+		const int id = threadIdx.x + blockIdx.x * blockDim.x;
+		if (id >= testVectorsCount) return;
+
+		if (isInCashe[blockIdx.y]) {
+			return;
+		}
+
+		const float* currentVector = testVectors + atributeCount*id;
+		float currentVectorCashe[200];
+		for (int i = 0; i < atributeCount; i++)
+		{
+			currentVectorCashe[i] = currentVector[i];
+		}
+
+
+		int a = (threadIdx.y*k*testVectorsCount) + (id*k);
+		HeapData<float> * heap = heapMemory + (blockIdx.y*k*testVectorsCount) + (id*k);
+
+		initializeHeap(heap, k);
+
+		for (int i = 0; i < teachingVectorsCount; i++)
+		{
+
+			const float* currentOther = teachingVectors + atributeCount*i;
+			float result = 0;
+			for (int j = 0; j < currentVectorSize; j++)
+			{
+				const int indece = indecesCashe[j];
+				const float diffrence = currentVectorCashe[indece] - currentOther[indece];
+				result += diffrence*diffrence;
+			}
+
+			result = sqrt(result);
+
+			if (result < heap[0].val) {
+				heap[0].val = result;
+				heap[0].label = teachingValues[i];
+				hipify(heap, k);
+			}
+
+		}
+
+		float avrage = 0;
+
+		for (int i = 0; i < k; i++)
+		{
+			avrage += heap[i].label;
+		}
+
+		avrage /= (float)k;
+	
+		const float dif = avrage - testValues[blockIdx.y];
+		atomicAdd(squaredDiff + blockIdx.y, dif*dif);
+
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	struct Lock
+	{
+		int mutex = 0;
+
+		__device__ void lock() {
+			while (atomicCAS(&mutex, 0, 1) != 0);
+			
+		}
+		__device__ void unlock() {
+			atomicExch(&mutex, 0);
+		}
+
+	};
+
+	struct Node {
+		Lock lock;
+		Node* one = nullptr;
+		Node* zero = nullptr;
+	};
+
+	__global__ void saveToCashe(
+		const unsigned char* population,
+		const float* accuracyValues,
+		Node* root
+	) 
+	{
+		const int warp = (blockIdx.x*blockDim.x+threadIdx.x) % 32;
+		if (warp != 0) {
+			return;
+		}
+		const int id = (blockIdx.x*blockDim.x + threadIdx.x)/32;
+		if (id >= popSize) return;
+
+		const unsigned char * gen = population + id*atributeCount;
+
+		int i = 0;
+		Node* currentNode = root;
+
+		for (int i = 0; i < atributeCount-1; i++)
+		{
+			Node ** nextNode = gen[i] ? &currentNode->one : &currentNode->zero;
+			if (!*nextNode) {
+				currentNode->lock.lock();
+				if (!*nextNode) {
+					*nextNode = new Node();
+				}
+				currentNode->lock.unlock();
+			}
+			currentNode = *nextNode;
+		}
+
+		float ** accuracyValue = gen[atributeCount-1] ? (float**)&currentNode->one : (float**)&currentNode->zero;
+		if (!*accuracyValue) {
+			currentNode->lock.lock();
+			if (!*accuracyValue) {
+				*accuracyValue = new float(accuracyValues[id]);
+				float a = **accuracyValue;
+				float b = a;
+			}
+			currentNode->lock.unlock();
+		}
+
+
+	}
+
+
+
+	__global__ void readCashe(
+		const unsigned char* population,
+		float* result,
+		unsigned char* isInCashe,
+		Node * root
+	) {
+	
+		const int id = threadIdx.x;
+		const unsigned char * gen = population + atributeCount*id;
+
+		Node * currentNode = root;
+		for (int i = 0; i < atributeCount-1; i++)
+		{
+			Node* nextNode = gen[i] ? currentNode->one : currentNode->zero;
+			if (!nextNode) {
+				isInCashe[id] = 0;
+				result[id] = 0;
+				return;
+			}
+			currentNode = nextNode;
+		}
+
+		float* casheValue = gen[atributeCount-1] ? (float*)currentNode->one : (float*)currentNode->zero;
+		if (casheValue) {
+			result[id] = *casheValue;
+			isInCashe[id] = 1;
+		}
+		else {
+			isInCashe[id] = 0;
+			result[id] = 0;
+		}
+
+	}
+
+
 }
+

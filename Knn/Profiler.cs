@@ -43,8 +43,8 @@ public static class Profiler
             Console.WriteLine($"name:\t{item.Key}");
             Console.WriteLine($"avrageTime:\t{times.Average(x=>x.TotalMilliseconds)}");
             Console.WriteLine($"mediana:\t{mediana}");
-            Console.WriteLine($"max time:\t{times.Max()}");
-            Console.WriteLine($"min time:\t{times.Min()}");
+            Console.WriteLine($"max time:\t{times.Max(x=>x.TotalMilliseconds)}");
+            Console.WriteLine($"min time:\t{times.Min(x=>x.TotalMilliseconds)}");
             Console.WriteLine($"executedTimes:\t{times.Count()}");
             Console.WriteLine("-------------");
 

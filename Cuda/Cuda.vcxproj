@@ -181,6 +181,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
   <ItemGroup>
     <ClInclude Include="HeapData.h" />
     <ClInclude Include="qSort.h" />
+    <ClInclude Include="splitCopy.h" />
     <ClInclude Include="uniform_int.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -1,9 +1,5 @@
-#include <cuda.h> 
-#include <device_launch_parameters.h> 
-#include <texture_fetch_functions.h> 
 #include <builtin_types.h> 
 #include <vector_functions.h> 
-#include "float.h"
 #include <float.h>
 #include <thrust/sort.h>
 
@@ -13,30 +9,31 @@
 
 #include "uniform_int.h"
 
+template<typename T,typename U>
+__device__ void vectorisedMemcpy(const T* src,T* desc,int size) 
+{
+	static_assert(sizeof(U)>=sizeof(T),"");
+	constexpr int ration = (sizeof(U) / sizeof(T));
+
+	const int bulkSize = size / ration;
+	for (int i = 0; i < bulkSize; i++)
+	{
+		reinterpret_cast<U*>(desc)[i] = reinterpret_cast<const U*>(src)[i];
+	}
+
+	for (int i = size - (size/ ration) ; i < size; i++)
+	{
+		desc[i] = src[i];
+	}
+
+}
+
+
 
 extern "C" {
 
 	__constant__ int genLength;
 
-
-	__global__ void countVectors(
-		unsigned char* gens,
-		int* vectorSizes
-	) {
-
-		const int id = threadIdx.x + blockIdx.x * blockDim.x;
-		//if (id >= popSize) return;
-
-		vectorSizes[id] = 0;
-		const unsigned char* currentGen = gens + genLength*id;
-
-		for (int i = 0; i < genLength; i++)
-		{
-			if (currentGen[i])
-				vectorSizes[id]++;
-		}
-
-	}
 
 	__constant__ int popSize;
 	__constant__ float mutationRate;
@@ -48,11 +45,12 @@ extern "C" {
 	__global__ void genetic(
 		const unsigned char* currentPopulation,
 		unsigned char* nextPopulation,
-		float* sortedFitness,
-		int* fitnessIndeces
+		const float* sortedFitness,
+		const int* fitnessIndeces
 	) {
 		extern __shared__ int shared[];
 		int* turnamentWinners = (int*)shared;
+
 
 		const int id = threadIdx.x;
 
@@ -73,70 +71,81 @@ extern "C" {
  
 		unsigned char* destination = nextPopulation + genLength*id;
 
-		if (id >= eliteIndex) {
-			const unsigned char * eliteParent = currentPopulation + fitnessIndeces[id];
-			memcpy(destination, eliteParent, genLength);
+		if (id>=eliteIndex) {
+			const unsigned char*  eliteParent = currentPopulation + fitnessIndeces[id]*genLength;
+			for (int i = 0; i < genLength; i++)
+			{
+				destination[i] = eliteParent[i];
+			}
+
 			return;
 		}
 
-		//crossover
+		//crossover old
 		{
 
-			const int parent1Index = uniform_int(state, popSize - 1);
-			const int parent2Index = uniform_int(state, popSize - 1);
-			const int crossoverPoint = uniform_int(state, genLength - 1);
-			const float crossoverChance = curand_uniform(&state);
+			//const int parent1Index = uniform_int(state, popSize - 1);
+			//const int parent2Index = uniform_int(state, popSize - 1);
+			//const int crossoverPoint = uniform_int(state, genLength - 1);
+			//const float crossoverChance = curand_uniform(&state);
 
 
-			const unsigned char* firstParent =
-				currentPopulation + turnamentWinners[parent1Index] * genLength;
+			//const unsigned char* firstParent =
+			//	currentPopulation + turnamentWinners[parent1Index] * genLength;
 
- 			const unsigned char* secondParent =
-				currentPopulation + turnamentWinners
-				[
-					crossoverChance < crossoverRate ? parent2Index : parent1Index
-				] * genLength + crossoverPoint;
+ 		//	const unsigned char* secondParent =
+			//	currentPopulation + turnamentWinners
+			//	[
+			//		crossoverChance < crossoverRate ? parent2Index : parent1Index
+			//	] * genLength + crossoverPoint;
 
-			unsigned char* destinationSecondPart = destination + crossoverPoint;
-
-			for (int i = 0; i < crossoverPoint; i++)
-			{
-				destination[i] = firstParent[i];
-			}
-
-			//unsigned char* secondPartDestination = destination + crossoverPoint;
-			//const unsigned char* secondPartOfSecondParent = secondParent+ crossoverPoint;
-
-			const int count = genLength - crossoverPoint;
-			for (int i = 0; i < count; i++)
-			{
-				destinationSecondPart[i] = secondParent[i];
-			}
+			//unsigned char* destinationSecondPart = destination + crossoverPoint;
 
 
-			//memcpy(destination, firstParent, crossoverPoint);
-			//memcpy(destination + crossoverPoint, secondParent + crossoverPoint, genLength - crossoverPoint);
+			//for (int i = 0; i < crossoverPoint; i++)
+			//{
+			//	destination[i] = firstParent[i];
+			//}
 
-			/*
-			if (r < crossoverRate) {
-			const int crossoverPoint = uniform_int(state, genLength-1);
+			//const int count = genLength - crossoverPoint;
+			//for (int i = 0; i < count; i++)
+			//{
+			//	destinationSecondPart[i] = secondParent[i];
+			//}
 
-			const unsigned char* firstParent =
-			currentPopulation + turnamentWinners[uniform_int(state,popSize-1)] * genLength;
-			const unsigned char* secondParent =
-			currentPopulation + turnamentWinners[uniform_int(state, popSize - 1)] * genLength;
 
-			memcpy(destination, firstParent, crossoverPoint);
-			memcpy(destination+crossoverPoint, secondParent+crossoverPoint, genLength - crossoverPoint);
-
-			}
-			else {
-			const unsigned char* firstParent =
-			currentPopulation + turnamentWinners[uniform_int(state, popSize - 1)] * genLength;
-			memcpy(destination, firstParent, genLength);
-			}
-			*/
 		}
+
+
+		{
+			const int crossoverCount = 10;
+			
+			int crossoverPoints[1026];
+			crossoverPoints[0] = 0;
+			for (int i = 1; i < crossoverCount+1; i++)
+			{
+				crossoverPoints[i] = uniform_int(state, genLength - 1);
+			}
+
+			crossoverPoints[crossoverCount + 1] = genLength;
+
+			thrust::sort(crossoverPoints+1, crossoverPoints + crossoverCount+1,thrust::less<int>());
+
+			for (int i = 0; i < crossoverCount; i++)
+			{
+				const unsigned char * __restrict__ parent =
+					currentPopulation+ (turnamentWinners[uniform_int(state, popSize - 1)])*genLength;
+
+
+				for (int j = crossoverPoints[i]; j < crossoverPoints[i+1]; j++)
+				{
+					destination[j] = parent[j];
+				}
+
+			}
+
+		}
+
 
 		//mutation
 		{

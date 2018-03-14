@@ -4,11 +4,11 @@ using System.Linq;
 using System.Threading.Tasks;
 
 public static class CudaDataSetExtensions {
-    public static CudaDataSet Filter(
-        this CudaDataSet data,
+    public static CudaDataSet<T> Filter<T>(
+        this CudaDataSet<T> data,
         int[] indexesToStay)
     {
-        return new CudaDataSet() {
+        return new CudaDataSet<T>() {
             Vectors = data.Vectors.Filter(indexesToStay),
             Classes = data.Classes.Filter(indexesToStay),
             orginalIndeces = data.orginalIndeces.Filter(indexesToStay)
@@ -17,11 +17,11 @@ public static class CudaDataSetExtensions {
 
     }
 
-    public static void ResetIndeces(this CudaDataSet set) {
+    public static void ResetIndeces<T>(this CudaDataSet<T> set) {
         set.orginalIndeces = DataSetHelper.CreateIndeces(set);
     }
 
-    public static HostDataset ToHostDataSet(this CudaDataSet set)
+    public static HostDataset ToHostDataSet(this CudaDataSet<int> set)
     {
         return new HostDataset() {
             Vectors = set.Vectors.To2d(),
@@ -35,10 +35,10 @@ public static class CudaDataSetExtensions {
 }
 
 
-public class CudaDataSet
+public class CudaDataSet<T>
 {
     public FlattArray<float> Vectors;
-    public int[] Classes;
+    public T[] Classes;
     public int[] orginalIndeces;
 }
 
@@ -52,7 +52,7 @@ public static class DataSetHelper
 {
     static Random rand = new Random();
 
-    public static void Shuffle(CudaDataSet data)
+    public static void Shuffle<T>(CudaDataSet<T> data)
     {
 
         for (int i = 0; i < data.Classes.Length; i++)
@@ -64,16 +64,16 @@ public static class DataSetHelper
     }
 
 
-    public static CudaDataSet[] Split(CudaDataSet data, float[] parts)
+    public static CudaDataSet<T>[] Split<T>(CudaDataSet<T> data, float[] parts)
     {
-        var result = new CudaDataSet[parts.Length];
+        var result = new CudaDataSet<T>[parts.Length];
         var splitedClasses = Split(data.Classes, parts);
         var splitedVectors = Split(data.Vectors, parts);
         var splitedIndeces = Split(data.orginalIndeces, parts);
 
         for (int i = 0; i < splitedClasses.Length; i++)
         {
-            result[i] = new CudaDataSet()
+            result[i] = new CudaDataSet<T>()
             {
                 Vectors = splitedVectors[i],
                 Classes = splitedClasses[i],
@@ -138,7 +138,7 @@ public static class DataSetHelper
     }
 
 
-    private static void Swap(this CudaDataSet data, int row1, int row2)
+    private static void Swap<T>(this CudaDataSet<T> data, int row1, int row2)
     {
         data.Vectors.Swap(row1, row2);
         data.Classes.Swap(row1, row2);
@@ -146,7 +146,7 @@ public static class DataSetHelper
         
     }
 
-    public static void Normalize(CudaDataSet data) {
+    public static void Normalize<T>(CudaDataSet<T> data) {
 
 
         var vectors = data.Vectors;
@@ -209,7 +209,7 @@ public static class DataSetHelper
 
     }
 
-    public static float[] ColumnsAvrages(CudaDataSet data) {
+    public static float[] ColumnsAvrages<T>(CudaDataSet<T> data) {
         
         var vectors = data.Vectors;
         float[] avg = new float[vectors.GetLength(1)];
@@ -222,7 +222,7 @@ public static class DataSetHelper
         return avg;
     }
 
-    public static int[] CreateIndeces(CudaDataSet set) {
+    public static int[] CreateIndeces<T>(CudaDataSet<T> set) {
         int len = set.Classes.Length;
         int[] res = new int[len];
 
@@ -233,33 +233,33 @@ public static class DataSetHelper
 
         return res;
     }
-    public static CudaDataSet readIris()
+    public static CudaDataSet<int> readIris()
     {
-        var irisDescription = new LabelReader.Type[] {
-                LabelReader.Type.param,
-                LabelReader.Type.param,
-                LabelReader.Type.param,
-                LabelReader.Type.param,
-                LabelReader.Type.label
+        var irisDescription = new Type[] {
+                Type.param,
+                Type.param,
+                Type.param,
+                Type.param,
+                Type.label
             };
 
         LabelReader reader = new LabelReader(irisDescription);
         reader.ReadFile("dataSets/iris.csv");
         return reader.DataSet;
     }
-    public static CudaDataSet readPoker() {
-        var pokerDescription = new LabelReader.Type[] {
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.label
+    public static CudaDataSet<int> readPoker() {
+        var pokerDescription = new Type[] {
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.label
         };
 
 
@@ -269,19 +269,19 @@ public static class DataSetHelper
         return reader.DataSet;
     }
 
-    public static CudaDataSet ReadMagic() {
-        var magidDescription = new LabelReader.Type[] {
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.label,
+    public static CudaDataSet<int> ReadMagic() {
+        var magidDescription = new Type[] {
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.label,
 
         };
 
@@ -291,34 +291,81 @@ public static class DataSetHelper
 
     }
 
-    public static CudaDataSet ReadPenBase() {
-        var PenDescription = new LabelReader.Type[] {
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.param,
-            LabelReader.Type.label,
-
+    public static CudaDataSet<int> ReadPenBase() {
+        var PenDescription = new Type[] {
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.param,
+            Type.label,
         };
 
         LabelReader reader = new LabelReader(PenDescription);
         reader.ReadFile("dataSets/penbased.csv");
         return reader.DataSet;
+    }
 
+    public static CudaDataSet<int> ReadNormalizedIris() {
+        var irisDescription = new Type[] {
+                Type.param,
+                Type.param,
+                Type.param,
+                Type.param,
+                Type.label
+            };
+
+        LabelReader reader = new LabelReader(irisDescription);
+        //reader.Separator = '\t';
+        reader.ReadFile("dataSets/iris_std_sh.txt");
+        return reader.DataSet;
 
     }
+
+
+    public static CudaDataSet<float> ReadHouse()
+    {
+
+        var HouseDescription = new List<Type>();
+        for (int i = 0; i < 16; i++)
+        {
+            HouseDescription.Add(Type.param);
+        }
+        HouseDescription.Add(Type.label);
+
+
+        RegresionReader reader = new RegresionReader(HouseDescription.ToArray());
+        reader.ReadFile("dataSets/house.csv");
+        return reader.DataSet;
+    }
+
+    //public static CudaDataSet<float> ReadCompactiv()
+    //{
+
+    //    var HouseDescription = new List<Type>();
+    //    for (int i = 0; i < 16; i++)
+    //    {
+    //        HouseDescription.Add(Type.param);
+    //    }
+    //    HouseDescription.Add(Type.label);
+
+
+    //    RegresionReader reader = new RegresionReader(HouseDescription.ToArray());
+    //    reader.ReadFile("dataSets/penbased.csv");
+    //    return reader.DataSet;
+    //}
+
 
 
 }

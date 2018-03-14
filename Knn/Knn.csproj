@@ -121,6 +121,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CountVectorKernel.cs" />
+    <Compile Include="DimensionReductionAccuracy.cs" />
     <Compile Include="DimensionReductionFitness.cs" />
     <Compile Include="ArrayExtensions.cs" />
     <Compile Include="Drop3.cs" />
@@ -139,11 +140,18 @@
     </Compile>
     <Compile Include="Thrust.cs" />
     <Compile Include="Utils.cs" />
+    <Compile Include="VectorReductionAccuracy.cs" />
     <Compile Include="VectorReductionFitness.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
     <None Include="dataSets\breast-cancer.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="dataSets\compactiv.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="dataSets\house.csv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="dataSets\iris.csv">
@@ -195,6 +203,9 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="dataSets\iris_std_sh.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="kernels\Cuda.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
