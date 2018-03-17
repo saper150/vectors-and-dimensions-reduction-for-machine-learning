@@ -18,83 +18,17 @@ struct HeapData
     public int label;
 }
 
+class Options {
+    public string TrainSetPath { get; set; }
+    public string TestSetPath { get; set; }
+    public int K { get; set; }
+    public float Alpha { get; set; }
+    public int PopSize { get; set; }
+    public int Iterations { get; set; }
+}
 
 class Program
 {
-
-
-    //static float Knn(CudaDataSet teaching, CudaDataSet test, int k = 3, int threadsPerBlock = 256)
-    //{
-    //    CudaContext context = new CudaContext();
-    //    var kernel = context.LoadKernel("kernels/kernel.ptx", "knnKernal");
-    //    kernel.GridDimensions = test.Vectors.GetLength(0) / threadsPerBlock + 1;
-    //    kernel.BlockDimensions = threadsPerBlock;
-
-
-    //    CudaDeviceVariable<float> teachingDevice = teaching.Vectors.Raw;
-    //    CudaDeviceVariable<float> testDevice = test.Vectors.Raw;
-    //    CudaDeviceVariable<int> labelDevice = teaching.Classes;
-    //    CudaDeviceVariable<int> testLabels = test.Classes;
-
-    //    CudaDeviceVariable<HeapData> heapMemory =
-    //        new CudaDeviceVariable<HeapData>(test.Vectors.GetLength(0) * k);
-
-    //    heapMemory.Memset(uint.MaxValue);
-
-
-    //    kernel.Run(
-    //        teachingDevice.DevicePointer,//teaching vectors
-    //        teaching.Vectors.GetLength(0),//teaching count
-    //        testDevice.DevicePointer,//testVectors
-    //        test.Vectors.GetLength(0),//test count
-    //        labelDevice.DevicePointer,//labels
-    //        test.Vectors.GetLength(1),//vectorLen
-    //        k,
-    //        heapMemory.DevicePointer
-    //    );
-
-    //    FlattArray<HeapData> maxL =
-    //        new FlattArray<HeapData>(heapMemory, k);
-
-    //    int failureCount = 0;
-    //    for (int i = 0; i < maxL.GetLength(0); i++)
-    //    {
-    //        var labelCounts = new Dictionary<int, int>();
-    //        for (int j = 0; j < maxL.GetLength(1); j++)
-    //        {
-    //            if (labelCounts.ContainsKey(maxL[i, j].label))
-    //            {
-    //                labelCounts[maxL[i, j].label]++;
-    //            }
-    //            else
-    //            {
-    //                labelCounts[maxL[i, j].label] = 1;
-    //            }
-    //        }
-
-    //        var guesedLabel = labelCounts.Aggregate((max, current) =>
-    //        {
-    //            if (current.Value > max.Value)
-    //            {
-    //                return current;
-    //            }
-    //            else
-    //            {
-    //                return max;
-    //            }
-    //        }).Key;
-
-    //        if (guesedLabel != test.Classes[i])
-    //        {
-    //            failureCount++;
-    //        }
-    //    }
-
-    //    context.Dispose();
-
-    //    return (float)(test.Vectors.GetLength(0) - failureCount) / (float)test.Vectors.GetLength(0);
-
-    //}
 
     public static FlattArray<byte> CreateRandomPopulation(int popSize, int genLength)
     {
@@ -200,80 +134,77 @@ class Program
             //  Profiler.Print();
 
         }
-
-
-
     }
-    static void ReduceVectorsRegresion(CudaDataSet<float> teaching, CudaDataSet<float> test)
+
+    //static void ReduceVectorsRegresion(CudaDataSet<float> teaching, CudaDataSet<float> test)
+    //{
+    //    using (CudaContext context = new CudaContext())
+    //    {
+
+    //        int popSize = 100;
+    //        var deviceTeaching = new DeviceDataSet<float>(teaching);
+    //        var deviceTest = new DeviceDataSet<float>(test);
+
+    //        FlattArray<byte> initialPopulation;
+
+    //        var acc= new VectorReductionAccuracyRegresion(context, deviceTeaching, deviceTest, popSize)
+    //        {
+    //            K = 3,
+    //            CountToPass = 2
+    //        };
+
+    //        VectorReductionFitness fitnessFunc =
+    //            new VectorReductionFitness(context, acc, popSize, deviceTeaching.length)
+    //            {
+    //                Alpha = 0.7f
+    //            };
+
+    //        initialPopulation = CreateRandomPopulation(popSize,deviceTeaching.length);
+
+    //        var d = new Evolutionary2(context, fitnessFunc, initialPopulation)
+    //        {
+    //            Elitism = 0.1f,
+    //            MutationRate = 0.05f
+    //        };
+    //        for (int i = 0; i < 10; i++)
+    //        {
+    //            Profiler.Start("iteration");
+    //            d.CreateNewPopulation();
+    //            Profiler.Stop("iteration");
+
+    //        }
+    //        Console.WriteLine(acc.BaseAccuracy());
+    //        var best = d.FindFitest();
+    //        Console.WriteLine(acc.GenAccuracy(best.index));
+    //        Console.WriteLine(fitnessFunc.GenLength(best.index)/(float)deviceTeaching.length);
+
+    //        Profiler.Print();
+
+    //    }
+
+    //}
+
+
+
+    static void ReduceVectors(CudaDataSet<int> teaching, CudaDataSet<int> test, Options options)
     {
         using (CudaContext context = new CudaContext())
         {
-
-            int popSize = 100;
-            var deviceTeaching = new DeviceDataSet<float>(teaching);
-            var deviceTest = new DeviceDataSet<float>(test);
-
-            FlattArray<byte> initialPopulation;
-
-            var acc= new VectorReductionAccuracyRegresion(context, deviceTeaching, deviceTest, popSize)
-            {
-                K = 3,
-                CountToPass = 2
-            };
-
-            VectorReductionFitness fitnessFunc =
-                new VectorReductionFitness(context, acc, popSize, deviceTeaching.length)
-                {
-                    Alpha = 0.7f
-                };
-
-            initialPopulation = CreateRandomPopulation(popSize,deviceTeaching.length);
-
-            var d = new Evolutionary2(context, fitnessFunc, initialPopulation)
-            {
-                Elitism = 0.1f,
-                MutationRate = 0.05f
-            };
-            for (int i = 0; i < 10; i++)
-            {
-                Profiler.Start("iteration");
-                d.CreateNewPopulation();
-                Profiler.Stop("iteration");
-
-            }
-            Console.WriteLine(acc.BaseAccuracy());
-            var best = d.FindFitest();
-            Console.WriteLine(acc.GenAccuracy(best.index));
-            Console.WriteLine(fitnessFunc.GenLength(best.index)/(float)deviceTeaching.length);
-
-            Profiler.Print();
-
-        }
-
-    }
-
-
-
-    static void ReduceVectors(CudaDataSet<int> teaching, CudaDataSet<int> test)
-    {
-        using (CudaContext context = new CudaContext())
-        {
-
-            int popSize = 100;
             DeviceDataSet<int> deviceTeaching = new DeviceDataSet<int>(teaching);
             DeviceDataSet<int> deviceTest = new DeviceDataSet<int>(test);
 
             FlattArray<byte> initialPopulation;
 
-            VectorReductionAccuracy acc = new VectorReductionAccuracy(context, deviceTeaching, deviceTest, popSize) {
-                K = 5,
-                CountToPass = 3
+            VectorReductionAccuracy acc = new VectorReductionAccuracy(context, deviceTeaching, deviceTeaching, options)
+            {
+                K = options.K,
+                CountToPass = (int)Math.Ceiling((double)options.K / 2)
             };
 
             VectorReductionFitness fitnessFunc =
-                new VectorReductionFitness(context, acc, popSize, deviceTeaching.length)
+                new VectorReductionFitness(context, acc, options, deviceTeaching.length)
                 {
-                    Alpha = 0.7f
+                    Alpha = options.Alpha
                 };
 
             //Drop3 drop = new Drop3();
@@ -293,58 +224,104 @@ class Program
 
 
 
-            initialPopulation = CreateRandomPopulation(popSize, deviceTeaching.length);
-                //CreatePopulationBasedOnParent(parrent, popSize, 0.2f, 0.05f);
+            initialPopulation = CreateRandomPopulation(options.PopSize, deviceTeaching.length);
+            //CreatePopulationBasedOnParent(parrent, popSize, 0.2f, 0.05f);
 
             var d = new Evolutionary2(context, fitnessFunc, initialPopulation)
             {
                 Elitism = 0.001f,
                 MutationRate = 0.001f
             };
-            for (int i = 0; i < 3000; i++)
+            for (int i = 0; i < options.Iterations; i++)
             {
                 Profiler.Start("iteration");
                 d.CreateNewPopulation();
                 Profiler.Stop("iteration");
-
             }
+
+            //float[] acccc = acc.CalculateAccuracy(Enumerable.Repeat((byte)1, deviceTeaching.length).ToArray(), 1);
+
             var best = d.FindFitest();
-            Console.WriteLine(acc.GenAccuracy(best.index)/(float) deviceTest.length);
+            Console.WriteLine(acc.GenAccuracy(best.index) / (float)deviceTeaching.length);
             Console.WriteLine(fitnessFunc.GenLength(best.index));
 
-            Profiler.Print();
+            var b = d.genGen(best.index);
+
+
+            options.PopSize = 1;
+            VectorReductionAccuracy finnalAcc = new VectorReductionAccuracy(context, deviceTeaching, deviceTest, options)
+            {
+                K = options.K,
+                CountToPass = (int)Math.Ceiling((double)options.K / 2)
+            };
+
+            float[] accccc =  finnalAcc.CalculateAccuracy(d.genGen(best.index), 0);
+
+            finnalAcc.CalculateAccuracy(Enumerable.Repeat((byte)1,deviceTeaching.length).ToArray(), 0);
+
+            Console.WriteLine(finnalAcc.GenAccuracy(0)/ (float)deviceTest.length);
+
+            //Profiler.Print();
 
         }
 
     }
 
+
+
+
     static void Main(string[] args)
     {
-
-
-
-
         System.Globalization.CultureInfo customCulture = (System.Globalization.CultureInfo)System.Threading.Thread.CurrentThread.CurrentCulture.Clone();
         customCulture.NumberFormat.NumberDecimalSeparator = ".";
         System.Threading.Thread.CurrentThread.CurrentCulture = customCulture;
 
-        {
-            var data = DataSetHelper.ReadMagic();
-            DataSetHelper.Normalize(data);
-            DataSetHelper.Shuffle(data);
-            var splited = DataSetHelper.Split(data, new float[] { 0.7f, 0.3f });
-            splited[0].ResetIndeces();
-            ReduceVectors(splited[0], splited[1]);
-        }
+        var options = new Options();
+
+        //for (int i = 0; i < args.Length; i++)
+        //{
+
+        //    if ( i-1== args.Length && args[i] == "--traintSet")
+        //    {
+        //        options.TrainSetPath = args[i + 1];
+        //    } else if (i - 1 == args.Length && args[i] == "--testSet")
+        //    {
+        //        options.TestSetPath= args[i + 1];
+        //    }
+        //    else if (i - 1 == args.Length && args[i] == "--k")
+        //    {
+        //        options.K = int.Parse(args[i + 1]);
+        //    }
+        //    else if (i - 1 == args.Length && args[i] == "--alpha")
+        //    {
+        //        options.Alpha = float.Parse(args[i + 1]);
+        //    }
+        //}
+
+        options.Alpha = 0.1f;
+        options.K = 3;
+        options.TrainSetPath = "dataSets/iris-train.csv";
+        options.TestSetPath = "dataSets/iris-test.csv";
+        options.Iterations = 10;
+        options.PopSize = 10;
+
+       // DataSetHelper.CreateTrainingAndTestDataset("dataSets/iris.csv", 0.25f);
 
         {
-            var regresionData = DataSetHelper.ReadHouse();
-            DataSetHelper.Normalize(regresionData);
-            DataSetHelper.Shuffle(regresionData);
-            var regresionSplited = DataSetHelper.Split(regresionData, new float[] { 0.75f, 0.25f });
-
-            //ReduceVectorsRegresion(regresionSplited[0], regresionSplited[1]);
+            var train = DataSetHelper.LoadDataSet(options.TrainSetPath);
+            var test = DataSetHelper.LoadDataSet(options.TestSetPath);
+            ReduceVectors(train, test, options);
         }
+
+        //Console.WriteLine("Done");
+        //{
+        //    var regresionData = DataSetHelper.ReadHouse();
+        //    DataSetHelper.Normalize(regresionData);
+        //    DataSetHelper.Shuffle(regresionData);
+        //    var regresionSplited = DataSetHelper.Split(regresionData, new float[] { 0.75f, 0.25f });
+
+        //    //ReduceVectorsRegresion(regresionSplited[0], regresionSplited[1]);
+        //}
         //ReduceDimension(splited[0],splited[1]);
 
 

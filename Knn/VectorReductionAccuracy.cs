@@ -9,7 +9,7 @@ using ManagedCuda.VectorTypes;
 
 interface IVectorReductionAccuracy
 {
-    CudaDeviceVariable<float> CalculateAccuracy(CudaDeviceVariable<byte> population);
+    CudaDeviceVariable<float> CalculateAccuracy(CudaDeviceVariable<byte> population,int startIndex = 1);
     float GenAccuracy(int index);
 }
 
@@ -110,11 +110,11 @@ class VectorReductionAccuracy : IVectorReductionAccuracy
 
 
 
-    public VectorReductionAccuracy(CudaContext context, DeviceDataSet<int> teaching, DeviceDataSet<int> test, int popSize)
+    public VectorReductionAccuracy(CudaContext context, DeviceDataSet<int> teaching, DeviceDataSet<int> test, Options options )
     {
         this.teaching = teaching;
         this.test = test;
-        this.popSize = popSize;
+        this.popSize = options.PopSize;
         this.context = context;
 
         calculatedNeabours = new CudaDeviceVariable<int>(teaching.length * test.length);
@@ -140,8 +140,7 @@ class VectorReductionAccuracy : IVectorReductionAccuracy
         accuracyKernel.SetConstantVariable("attributeCount", teaching.attributeCount);
         accuracyKernel.SetConstantVariable("genLength", teaching.length);
 
-        K = 3;
-        CountToPass = 2;
+        K = options.K;
 
     }
 
@@ -152,8 +151,9 @@ class VectorReductionAccuracy : IVectorReductionAccuracy
 
     }
 
-    public CudaDeviceVariable<float> CalculateAccuracy(CudaDeviceVariable<byte> population)
+    public CudaDeviceVariable<float> CalculateAccuracy(CudaDeviceVariable<byte> population, int startIndex = 1)
     {
+        byte[] pop = population;
         Profiler.Start("clear accuracy memory");
         context.ClearMemory(deviceAccuracy.DevicePointer, 0, deviceAccuracy.SizeInBytes);
         Profiler.Stop("clear accuracy memory");
@@ -163,7 +163,8 @@ class VectorReductionAccuracy : IVectorReductionAccuracy
             teaching.classes.DevicePointer,
             population.DevicePointer,
             calculatedNeabours.DevicePointer,
-            deviceAccuracy.DevicePointer
+            deviceAccuracy.DevicePointer,
+            startIndex
             );
         Profiler.Stop("accuracy Kernel");
         return deviceAccuracy;
@@ -331,7 +332,7 @@ class VectorReductionAccuracyRegresion : IVectorReductionAccuracy
 
 
 
-    public CudaDeviceVariable<float> CalculateAccuracy(CudaDeviceVariable<byte> population)
+    public CudaDeviceVariable<float> CalculateAccuracy(CudaDeviceVariable<byte> population,int startIndex = 1)
     {
         Profiler.Start("clear accuracy memory");
         context.ClearMemory(deviceAccuracy.DevicePointer, 0, deviceAccuracy.SizeInBytes);

@@ -35,11 +35,11 @@ class VectorReductionFitness : IFitnessFunction
     IVectorReductionAccuracy accuracyCalc;
     int teachingCount;
 
-    public VectorReductionFitness(CudaContext context, IVectorReductionAccuracy accuracyCalc, int popSize,int teachingCount)
+    public VectorReductionFitness(CudaContext context, IVectorReductionAccuracy accuracyCalc, Options options, int teachingCount)
     {
         this.teachingCount = teachingCount;
         this.accuracyCalc = accuracyCalc;
-        this.popSize = popSize;
+        this.popSize = options.PopSize;
         this.context = context;
         countVectorsKernel = new CountVectorKernel(context, popSize, teachingCount);
         vectorSizes = new CudaDeviceVariable<int>(popSize);
@@ -60,7 +60,6 @@ class VectorReductionFitness : IFitnessFunction
         Profiler.Start("Calculate accuracy");
         var deviceAccuracy = accuracyCalc.CalculateAccuracy(population);
         Profiler.Stop("Calculate accuracy");
-        float[] asdf = deviceAccuracy;
 
         Profiler.Start("Calculate vectorSizes");
         countVectorsKernel.Calculate(population, vectorSizes);
@@ -95,12 +94,6 @@ class VectorReductionFitness : IFitnessFunction
 
     }
 }
-
-
-
-
-
-
 
 
 //class VectorReductionFitness : IFitnessFunction

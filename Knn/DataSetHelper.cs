@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -48,8 +49,7 @@ public class HostDataset {
     public int[] OrginalIndeces;
 }
 
-public static class DataSetHelper
-{
+public static class DataSetHelper {
     static Random rand = new Random();
 
     public static void Shuffle<T>(CudaDataSet<T> data)
@@ -63,6 +63,55 @@ public static class DataSetHelper
 
     }
 
+    private static string RowToString(CudaDataSet<int> set, int row) {
+       return string.Join(",",
+            set.Vectors.To2d()[row]
+            .Select(x => x.ToString())
+            .Concat(new string[] { set.Classes[row].ToString() })
+       );
+    }
+    public static void CreateTrainingAndTestDataset(string path,float ration) {
+
+        var data = LoadDataSet(path);
+        Shuffle(data);
+        Normalize(data);
+        var result = Split(data, new float[] { ration, 1 - ration });
+        string fileName = Path.GetFileNameWithoutExtension(path);
+        var trainingSetPath = path.Replace(fileName, fileName + "-train");
+        using (var writer = new StreamWriter(path.Replace(fileName, fileName + "-test")))
+        {
+            for (int i = 0; i < result[0].Classes.Length; i++)
+            {
+                writer.WriteLine(RowToString(result[0], i));
+            }
+        }
+
+        using (var writer = new StreamWriter(path.Replace(fileName, fileName + "-train")))
+        {
+            for (int i = 0; i < result[1].Classes.Length; i++)
+            {
+                writer.WriteLine(RowToString(result[1], i));
+            }
+        }
+    }
+
+    public static CudaDataSet<int> LoadDataSet(string path) {
+
+        var lines = File.ReadLines(path);
+        int columnCount = lines.First().Split(',').Length;
+
+        var labels = Enumerable.Repeat(Type.param, columnCount - 1)
+            .Concat(new Type[] { Type.label })
+            .ToArray();
+
+        var reader = new LabelReader(labels)
+        {
+            Header = false
+        };
+        reader.ReadFile(path);
+        return reader.DataSet;
+
+    }
 
     public static CudaDataSet<T>[] Split<T>(CudaDataSet<T> data, float[] parts)
     {

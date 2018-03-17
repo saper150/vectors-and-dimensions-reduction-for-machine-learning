@@ -39,7 +39,7 @@ class Evolutionary2
 
 
     CudaDeviceVariable<byte> populationGens;
-    CudaDeviceVariable<byte> populationGens2;
+    public CudaDeviceVariable<byte> populationGens2;
 
     CudaDeviceVariable<float> deviceFitnes;
     CudaDeviceVariable<int> fitnessIndeces;
@@ -48,21 +48,6 @@ class Evolutionary2
 
 
     int popSize;
-
-    float _alpha;
-    public float Alpha
-    {
-        get
-        {
-            return _alpha;
-        }
-        set
-        {
-            _alpha = value;
-            performGeneticAlgorythm.SetConstantVariable("alpha", _alpha);
-
-        }
-    }
 
     float _mutationRate;
     public float MutationRate
@@ -142,7 +127,6 @@ class Evolutionary2
 
         MutationRate = 0.01f;
         CrossOverRate = 0.7f;
-        Alpha = 0.7f;
         Elitism = 0.2f;
 
         this.fitnessCalc = fitnessCalc;
@@ -195,13 +179,9 @@ class Evolutionary2
             performGeneticAlgorythm.BlockDimensions = popSize;
             performGeneticAlgorythm.DynamicSharedMemory =
                 (uint)(sizeof(float) * popSize);
-
     }
 
-
-  
-
-   public byte[] genGen(int index)
+    public byte[] genGen(int index)
     {
         byte[] hostpopulation = populationGens;
         byte[] res = new byte[genLength];
