@@ -6,16 +6,14 @@ using System.Text;
 using System.Threading.Tasks;
 
 
-public enum Type
-{
+public enum Type {
     param,
     label,
     skip
 }
 
 
-public class LabelReader
-{
+public class LabelReader {
 
     public char Separator { get; set; }
     public bool Header { get; set; }
@@ -30,7 +28,7 @@ public class LabelReader
     {
         get
         {
-            var set =new CudaDataSet<int>
+            var set = new CudaDataSet<int>
             {
                 Vectors = new FlattArray<float>(
                     f.ToArray(),
@@ -43,7 +41,7 @@ public class LabelReader
     }
 
 
-    
+    public bool PreserveClasses { get; set; } = false;
     int dictionaryIndex = 0;
 
     Type[] description;
@@ -80,7 +78,11 @@ public class LabelReader
             else if (description[i] == Type.label)
             {
 
-                if (!labelsDictionary.ContainsKey(splited[i]))
+                if (PreserveClasses)
+                {
+                    ClassList.Add(int.Parse(splited[i]));
+                }
+                else if (!labelsDictionary.ContainsKey(splited[i]))
                 {
                     labelsDictionary[splited[i]] = dictionaryIndex;
                     ClassList.Add(dictionaryIndex);
@@ -121,8 +123,7 @@ public class LabelReader
 
 
 
-public class RegresionReader
-{
+public class RegresionReader {
 
     public char Separator { get; set; }
     public bool Header { get; set; }

@@ -9,22 +9,25 @@ public static class CudaDataSetExtensions {
         this CudaDataSet<T> data,
         int[] indexesToStay)
     {
-        return new CudaDataSet<T>() {
+        return new CudaDataSet<T>()
+        {
             Vectors = data.Vectors.Filter(indexesToStay),
             Classes = data.Classes.Filter(indexesToStay),
             orginalIndeces = data.orginalIndeces.Filter(indexesToStay)
-            
+
         };
 
     }
 
-    public static void ResetIndeces<T>(this CudaDataSet<T> set) {
+    public static void ResetIndeces<T>(this CudaDataSet<T> set)
+    {
         set.orginalIndeces = DataSetHelper.CreateIndeces(set);
     }
 
     public static HostDataset ToHostDataSet(this CudaDataSet<int> set)
     {
-        return new HostDataset() {
+        return new HostDataset()
+        {
             Vectors = set.Vectors.To2d(),
             Classes = set.Classes,
             OrginalIndeces = set.orginalIndeces
@@ -36,8 +39,7 @@ public static class CudaDataSetExtensions {
 }
 
 
-public class CudaDataSet<T>
-{
+public class CudaDataSet<T> {
     public FlattArray<float> Vectors;
     public T[] Classes;
     public int[] orginalIndeces;
@@ -63,40 +65,46 @@ public static class DataSetHelper {
 
     }
 
-    private static string RowToString(CudaDataSet<int> set, int row) {
-       return string.Join(",",
-            set.Vectors.To2d()[row]
-            .Select(x => x.ToString())
-            .Concat(new string[] { set.Classes[row].ToString() })
-       );
+    private static string RowToString(CudaDataSet<int> set, int row)
+    {
+        return string.Join(",",
+             set.Vectors.To2d()[row]
+             .Select(x => x.ToString())
+             .Concat(new string[] { set.Classes[row].ToString() })
+        );
     }
-    public static void CreateTrainingAndTestDataset(string path,float ration) {
 
+
+    public static CudaDataSet<int>[] PrepareSet(string path, float ration)
+    {
         var data = LoadDataSet(path);
-        Shuffle(data);
         Normalize(data);
-        var result = Split(data, new float[] { ration, 1 - ration });
-        string fileName = Path.GetFileNameWithoutExtension(path);
-        var trainingSetPath = path.Replace(fileName, fileName + "-train");
-        using (var writer = new StreamWriter(path.Replace(fileName, fileName + "-test")))
-        {
-            for (int i = 0; i < result[0].Classes.Length; i++)
-            {
-                writer.WriteLine(RowToString(result[0], i));
-            }
-        }
+        Shuffle(data);
+        return Split(data, new float[] { ration, 1 - ration });
+    }
 
-        using (var writer = new StreamWriter(path.Replace(fileName, fileName + "-train")))
+    public static void SaveDataSet(CudaDataSet<int> set, string path)
+    {
+        using (var writer = new StreamWriter(path))
         {
-            for (int i = 0; i < result[1].Classes.Length; i++)
+            for (int i = 0; i < set.Classes.Length; i++)
             {
-                writer.WriteLine(RowToString(result[1], i));
+                var row = RowToString(set, i);
+                writer.WriteLine(RowToString(set, i));
             }
         }
     }
 
-    public static CudaDataSet<int> LoadDataSet(string path) {
+    public static void CreateTrainingAndTestDataset(string path, float ration)
+    {
+        var result = PrepareSet(path, ration);
+        string fileName = Path.GetFileNameWithoutExtension(path);
+        SaveDataSet(result[0], path.Replace(fileName, fileName + "-test"));
+        SaveDataSet(result[1], path.Replace(fileName, fileName + "-train"));
+    }
 
+    public static CudaDataSet<int> LoadDataSet(string path, bool preserveClasses = false)
+    {
         var lines = File.ReadLines(path);
         int columnCount = lines.First().Split(',').Length;
 
@@ -106,11 +114,11 @@ public static class DataSetHelper {
 
         var reader = new LabelReader(labels)
         {
-            Header = false
+            Header = false,
+            PreserveClasses = preserveClasses
         };
         reader.ReadFile(path);
         return reader.DataSet;
-
     }
 
     public static CudaDataSet<T>[] Split<T>(CudaDataSet<T> data, float[] parts)
@@ -192,10 +200,11 @@ public static class DataSetHelper {
         data.Vectors.Swap(row1, row2);
         data.Classes.Swap(row1, row2);
         data.orginalIndeces.Swap(row1, row2);
-        
+
     }
 
-    public static void Normalize<T>(CudaDataSet<T> data) {
+    public static void Normalize<T>(CudaDataSet<T> data)
+    {
 
 
         var vectors = data.Vectors;
@@ -215,7 +224,7 @@ public static class DataSetHelper {
 
         for (int i = 0; i < vectors.GetLength(1); i++)
         {
-            standardDeviation[i] = (float)Math.Sqrt(standardDeviation[i]/vectors.GetLength(0));
+            standardDeviation[i] = (float)Math.Sqrt(standardDeviation[i] / vectors.GetLength(0));
         }
 
         for (int row = 0; row < standardDeviation.GetLength(0); row++)
@@ -228,7 +237,8 @@ public static class DataSetHelper {
     }
 
 
-    public static float[] Variances(FlattArray<float> vectors) {
+    public static float[] Variances(FlattArray<float> vectors)
+    {
 
         float[] variances = new float[vectors.GetLength(1)];
         Parallel.For(0, vectors.GetLength(1), col =>
@@ -248,18 +258,20 @@ public static class DataSetHelper {
     }
 
 
-    public static float ColumnAvrage(FlattArray<float> data,int column) {
+    public static float ColumnAvrage(FlattArray<float> data, int column)
+    {
         float avg = 0;
         for (int i = 0; i < data.GetLength(0); i++)
         {
-            avg += data[i,column];
+            avg += data[i, column];
         }
         return avg / data.GetLength(0);
 
     }
 
-    public static float[] ColumnsAvrages<T>(CudaDataSet<T> data) {
-        
+    public static float[] ColumnsAvrages<T>(CudaDataSet<T> data)
+    {
+
         var vectors = data.Vectors;
         float[] avg = new float[vectors.GetLength(1)];
 
@@ -271,7 +283,8 @@ public static class DataSetHelper {
         return avg;
     }
 
-    public static int[] CreateIndeces<T>(CudaDataSet<T> set) {
+    public static int[] CreateIndeces<T>(CudaDataSet<T> set)
+    {
         int len = set.Classes.Length;
         int[] res = new int[len];
 
@@ -296,7 +309,8 @@ public static class DataSetHelper {
         reader.ReadFile("dataSets/iris.csv");
         return reader.DataSet;
     }
-    public static CudaDataSet<int> readPoker() {
+    public static CudaDataSet<int> readPoker()
+    {
         var pokerDescription = new Type[] {
             Type.param,
             Type.param,
@@ -318,7 +332,8 @@ public static class DataSetHelper {
         return reader.DataSet;
     }
 
-    public static CudaDataSet<int> ReadMagic() {
+    public static CudaDataSet<int> ReadMagic()
+    {
         var magidDescription = new Type[] {
             Type.param,
             Type.param,
@@ -340,7 +355,8 @@ public static class DataSetHelper {
 
     }
 
-    public static CudaDataSet<int> ReadPenBase() {
+    public static CudaDataSet<int> ReadPenBase()
+    {
         var PenDescription = new Type[] {
             Type.param,
             Type.param,
@@ -366,7 +382,8 @@ public static class DataSetHelper {
         return reader.DataSet;
     }
 
-    public static CudaDataSet<int> ReadNormalizedIris() {
+    public static CudaDataSet<int> ReadNormalizedIris()
+    {
         var irisDescription = new Type[] {
                 Type.param,
                 Type.param,

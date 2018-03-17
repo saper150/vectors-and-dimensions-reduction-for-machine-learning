@@ -9,14 +9,20 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web.Script.Serialization;
 
 
-
-struct HeapData
-{
+struct HeapData {
     public float val;
     public int label;
 }
+
+class Result {
+    public float Accurarcy { get; set; }
+    public float Compression { get; set; }
+    public int[] Vectors { get; set; }
+}
+
 
 class Options {
     public string TrainSetPath { get; set; }
@@ -27,8 +33,7 @@ class Options {
     public int Iterations { get; set; }
 }
 
-class Program
-{
+class Program {
 
     public static FlattArray<byte> CreateRandomPopulation(int popSize, int genLength)
     {
@@ -98,12 +103,7 @@ class Program
                     Alpha = 1f
                 };
 
-
-            Console.WriteLine(accuracy.BaseAccuracy());
-            Console.WriteLine();
             initialPopulation = CreateRandomPopulation(popSize, deviceTeaching.attributeCount);
-
-
 
             var d = new Evolutionary2(context, fitnessFunc, initialPopulation)
             {
@@ -120,7 +120,6 @@ class Program
 
             }
             var best = d.FindFitest();
-            // Console.WriteLine(best.fitness);
             var acc = accuracy.GenAccuracy(best.index);
             var len = fitnessFunc.GenLength(best.index);
             var gen = d.genGen(best.index);
@@ -186,7 +185,7 @@ class Program
 
 
 
-    static void ReduceVectors(CudaDataSet<int> teaching, CudaDataSet<int> test, Options options)
+    static Result ReduceVectors(CudaDataSet<int> teaching, CudaDataSet<int> test, Options options)
     {
         using (CudaContext context = new CudaContext())
         {
@@ -206,7 +205,6 @@ class Program
                 {
                     Alpha = options.Alpha
                 };
-
             //Drop3 drop = new Drop3();
             //drop.CasheSize = 5;
             //drop.K = 3;
@@ -225,7 +223,7 @@ class Program
 
 
             initialPopulation = CreateRandomPopulation(options.PopSize, deviceTeaching.length);
-            //CreatePopulationBasedOnParent(parrent, popSize, 0.2f, 0.05f);
+            ////CreatePopulationBasedOnParent(parrent, popSize, 0.2f, 0.05f);
 
             var d = new Evolutionary2(context, fitnessFunc, initialPopulation)
             {
@@ -239,15 +237,9 @@ class Program
                 Profiler.Stop("iteration");
             }
 
-            //float[] acccc = acc.CalculateAccuracy(Enumerable.Repeat((byte)1, deviceTeaching.length).ToArray(), 1);
+            ////float[] acccc = acc.CalculateAccuracy(Enumerable.Repeat((byte)1, deviceTeaching.length).ToArray(), 1);
 
             var best = d.FindFitest();
-            Console.WriteLine(acc.GenAccuracy(best.index) / (float)deviceTeaching.length);
-            Console.WriteLine(fitnessFunc.GenLength(best.index));
-
-            var b = d.genGen(best.index);
-
-
             options.PopSize = 1;
             VectorReductionAccuracy finnalAcc = new VectorReductionAccuracy(context, deviceTeaching, deviceTest, options)
             {
@@ -255,20 +247,25 @@ class Program
                 CountToPass = (int)Math.Ceiling((double)options.K / 2)
             };
 
-            float[] accccc =  finnalAcc.CalculateAccuracy(d.genGen(best.index), 0);
+            finnalAcc.CalculateAccuracy(d.genGen(best.index), 0);
+            byte[] gen = d.genGen(best.index);
+            List<int> vectorIndexes = new List<int>();
+            for (int i = 0; i < gen.Length; i++)
+            {
+                if (gen[i] != 0)
+                {
+                    vectorIndexes.Add(i);
+                }
+            }
 
-            finnalAcc.CalculateAccuracy(Enumerable.Repeat((byte)1,deviceTeaching.length).ToArray(), 0);
-
-            Console.WriteLine(finnalAcc.GenAccuracy(0)/ (float)deviceTest.length);
-
-            //Profiler.Print();
-
+            return new Result()
+            {
+                Vectors = vectorIndexes.ToArray(),
+                Accurarcy = finnalAcc.GenAccuracy(0) / deviceTest.length,
+                Compression = 1 - vectorIndexes.Count() / (float)deviceTeaching.length
+            };
         }
-
     }
-
-
-
 
     static void Main(string[] args)
     {
@@ -276,54 +273,23 @@ class Program
         customCulture.NumberFormat.NumberDecimalSeparator = ".";
         System.Threading.Thread.CurrentThread.CurrentCulture = customCulture;
 
-        var options = new Options();
+        var options = args.Length > 0 ? new JavaScriptSerializer().Deserialize<Options>(args[0])
+            : new Options()
+            {
+                Alpha = 0.8f,
+                K = 3,
+                TrainSetPath = "dataSets/iris-train.csv",
+                TestSetPath = "dataSets/iris-test.csv",
+                Iterations = 100,
+                PopSize = 80
+            };
 
-        //for (int i = 0; i < args.Length; i++)
-        //{
+        //DataSetHelper.CreateTrainingAndTestDataset("dataSets/iris.csv", 0.25f);
 
-        //    if ( i-1== args.Length && args[i] == "--traintSet")
-        //    {
-        //        options.TrainSetPath = args[i + 1];
-        //    } else if (i - 1 == args.Length && args[i] == "--testSet")
-        //    {
-        //        options.TestSetPath= args[i + 1];
-        //    }
-        //    else if (i - 1 == args.Length && args[i] == "--k")
-        //    {
-        //        options.K = int.Parse(args[i + 1]);
-        //    }
-        //    else if (i - 1 == args.Length && args[i] == "--alpha")
-        //    {
-        //        options.Alpha = float.Parse(args[i + 1]);
-        //    }
-        //}
-
-        options.Alpha = 0.1f;
-        options.K = 3;
-        options.TrainSetPath = "dataSets/iris-train.csv";
-        options.TestSetPath = "dataSets/iris-test.csv";
-        options.Iterations = 10;
-        options.PopSize = 10;
-
-       // DataSetHelper.CreateTrainingAndTestDataset("dataSets/iris.csv", 0.25f);
-
-        {
-            var train = DataSetHelper.LoadDataSet(options.TrainSetPath);
-            var test = DataSetHelper.LoadDataSet(options.TestSetPath);
-            ReduceVectors(train, test, options);
-        }
-
-        //Console.WriteLine("Done");
-        //{
-        //    var regresionData = DataSetHelper.ReadHouse();
-        //    DataSetHelper.Normalize(regresionData);
-        //    DataSetHelper.Shuffle(regresionData);
-        //    var regresionSplited = DataSetHelper.Split(regresionData, new float[] { 0.75f, 0.25f });
-
-        //    //ReduceVectorsRegresion(regresionSplited[0], regresionSplited[1]);
-        //}
-        //ReduceDimension(splited[0],splited[1]);
-
-
+        var test = DataSetHelper.LoadDataSet(options.TestSetPath, true);
+        var train = DataSetHelper.LoadDataSet(options.TrainSetPath, true);
+        var result = ReduceVectors(train, test, options);
+        Console.WriteLine(new JavaScriptSerializer().Serialize(result));
+        Profiler.Print();
     }
 }
