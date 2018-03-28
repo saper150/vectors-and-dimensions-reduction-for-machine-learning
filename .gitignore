@@ -251,6 +251,8 @@ paket-files/
 .idea/
 *.sln.iml
 
+*.dll
+*.exp
 *.ptx
 cudart64_80.dll
 cudart32_80.dll

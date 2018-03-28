@@ -273,23 +273,17 @@ class Program {
         customCulture.NumberFormat.NumberDecimalSeparator = ".";
         System.Threading.Thread.CurrentThread.CurrentCulture = customCulture;
 
-        var options = args.Length > 0 ? new JavaScriptSerializer().Deserialize<Options>(args[0])
-            : new Options()
-            {
-                Alpha = 0.8f,
-                K = 3,
-                TrainSetPath = "dataSets/iris-train.csv",
-                TestSetPath = "dataSets/iris-test.csv",
-                Iterations = 100,
-                PopSize = 80
-            };
 
-        //DataSetHelper.CreateTrainingAndTestDataset("dataSets/iris.csv", 0.25f);
+        var options = new JavaScriptSerializer().Deserialize<Options>(File.ReadAllText("./config.json"));
+
+        DataSetHelper.CreateTrainingAndTestDataset("dataSets/iris.csv", 0.25f);
 
         var test = DataSetHelper.LoadDataSet(options.TestSetPath, true);
         var train = DataSetHelper.LoadDataSet(options.TrainSetPath, true);
         var result = ReduceVectors(train, test, options);
         Console.WriteLine(new JavaScriptSerializer().Serialize(result));
-        Profiler.Print();
+        File.WriteAllText("output.json", new JavaScriptSerializer().Serialize(result));
+        //Profiler.Print();
+
     }
 }

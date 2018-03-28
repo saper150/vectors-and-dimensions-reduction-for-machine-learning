@@ -87,6 +87,9 @@ public static class DataSetHelper {
     {
         using (var writer = new StreamWriter(path))
         {
+            writer.WriteLine(
+                string.Join(",", Enumerable.Repeat("param" , set.Vectors.GetLength(1)).ToArray()) + ",label"
+            );
             for (int i = 0; i < set.Classes.Length; i++)
             {
                 var row = RowToString(set, i);
@@ -114,7 +117,7 @@ public static class DataSetHelper {
 
         var reader = new LabelReader(labels)
         {
-            Header = false,
+            Header = true,
             PreserveClasses = preserveClasses
         };
         reader.ReadFile(path);

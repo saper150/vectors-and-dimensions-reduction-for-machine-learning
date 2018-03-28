@@ -102,7 +102,8 @@ extern "C" {
 		const int* teachingClasses,
 		const unsigned char* populationGens,
 		const int* neaboursIndexes,
-		float* correctCounts
+		float* correctCounts,
+		int startIndex
 	) {
 		__shared__ int cashedGen;
 		__shared__ int cashedTeachingClass;
@@ -123,7 +124,7 @@ extern "C" {
 
 		int neaboursFound = 0;
 		int correctCount = 0;
-		for (int i = 0; i < neaboursSize && neaboursFound < k; i++)
+		for (int i = startIndex; i < neaboursSize && neaboursFound < k; i++)
 		{
 
 				const int p0 = currentNeaboursIndexes[i];

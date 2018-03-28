@@ -1,0 +1,8 @@
+﻿{
+  "Alpha": 0.8,
+  "K": 3,
+  "TrainSetPath": "dataSets/iris-train.csv",
+  "TestSetPath": "dataSets/iris-test.csv",
+  "Iterations": 100,
+  "PopSize": 80
+}
