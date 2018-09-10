@@ -252,5 +252,5 @@ paket-files/
 *.sln.iml
 
 *.ptx
-cudart64_80.dll
-cudart32_80.dll
+cudart64_91.dll
+cudart32_91.dll

@@ -301,7 +301,7 @@ class Program
                 Elitism = 0.001f,
                 MutationRate = 0.001f
             };
-            for (int i = 0; i < 3000; i++)
+            for (int i = 0; i < 30; i++)
             {
                 Profiler.Start("iteration");
                 d.CreateNewPopulation();
