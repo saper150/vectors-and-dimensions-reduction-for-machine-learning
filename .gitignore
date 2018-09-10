@@ -254,3 +254,6 @@ paket-files/
 *.ptx
 cudart64_91.dll
 cudart32_91.dll
+Knn/kernels/CudaFunctions.dll
+Knn/kernels/CudaFunctions.exp
+Knn/kernels/CudaFunctions.lib
